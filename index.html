@@ -179,6 +179,18 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
 .order-error.show{display:block;}
 .confirm-msg{display:none;background:rgba(184,224,47,.12);border:1px solid var(--lime);color:var(--lime);padding:12px 14px;border-radius:9px;font-weight:700;font-size:13.5px;margin-top:12px;}
 .confirm-msg.show{display:block;}
+.promo-row{display:flex;gap:8px;}
+.promo-row input{flex:1;}
+.promo-apply-btn{background:rgba(255,255,255,.08);color:#fff;font-weight:800;font-size:12.5px;padding:0 16px;border-radius:8px;border:1px solid var(--glass-border);white-space:nowrap;}
+.promo-apply-btn:disabled{opacity:.5;}
+.promo-msg{font-size:12.5px;margin-top:6px;min-height:16px;}
+.promo-msg.ok{color:var(--lime);}
+.promo-msg.err{color:#ff9b9b;}
+.urgency-badge{display:inline-block;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:20px;background:rgba(255,107,53,.15);border:1px solid var(--orange);color:var(--orange);width:fit-content;margin-left:6px;}
+.track-status{font-weight:800;font-size:14px;margin-bottom:8px;}
+.track-status.ok{color:var(--lime);}
+.track-status.warn{color:var(--orange);}
+.track-status.err{color:#ff9b9b;}
 
 @media (max-width:820px){
   .navlinks{display:none;}
@@ -215,6 +227,7 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
       <a href="#flavors">Flavors</a>
       <a href="#how">How it works</a>
       <a href="#about">About</a>
+      <a href="javascript:void(0)" onclick="openTrackModal()">Track order</a>
     </nav>
     <button class="burger" id="burgerBtn" onclick="toggleMobileNav()" aria-label="Menu">☰</button>
     <button class="cartbtn" onclick="openCart()">Cart <span class="cartcount" id="cartCount">0</span></button>
@@ -223,6 +236,7 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
     <a href="#flavors" onclick="closeMobileNav()">Flavors</a>
     <a href="#how" onclick="closeMobileNav()">How it works</a>
     <a href="#about" onclick="closeMobileNav()">About</a>
+    <a href="javascript:void(0)" onclick="openTrackModal()">Track order</a>
   </nav>
 </header>
 <div class="tagline-strip">ONE JUG · ONE FLAVOR · ONE PARTY — CHUG RESPONSIBLY, PARTY RESPONSIBLY</div>
@@ -331,6 +345,14 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
     <h3>Complete your order</h3>
     <div class="sub">Pay via GCash or Maya, then place your order — we'll confirm your payment and reach out to arrange delivery.</div>
     <div class="order-summary" id="orderSummary"></div>
+    <div class="field">
+      <label>Promo code (optional)</label>
+      <div class="promo-row">
+        <input id="promoInput" placeholder="e.g. WELCOME10" style="text-transform:uppercase;">
+        <button type="button" class="promo-apply-btn" onclick="applyPromoCode()">Apply</button>
+      </div>
+      <div class="promo-msg" id="promoMsg"></div>
+    </div>
     <div class="field"><label>Full name</label><input id="ordName" placeholder="Juan Dela Cruz"></div>
     <div class="field"><label>Email address</label><input id="ordEmail" type="email" placeholder="juan@email.com"></div>
     <div class="field"><label>Contact number</label><input id="ordPhone" placeholder="09XX XXX XXXX"></div>
@@ -346,7 +368,19 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
 
     <button class="checkoutbtn" id="placeOrderBtn" onclick="placeOrder()">Place order</button>
     <div class="order-error" id="orderError"></div>
-    <div class="confirm-msg" id="confirmMsg">Order placed! We've received your details and will confirm your payment and delivery shortly.</div>
+    <div class="confirm-msg" id="confirmMsg"></div>
+  </div>
+</div>
+
+<div class="modal" id="trackModal">
+  <div class="modal-box">
+    <h3>Track your order</h3>
+    <div class="sub">Enter your order number and the contact number you checked out with.</div>
+    <div class="field"><label>Order number</label><input id="trackOrderNo" placeholder="WEB-XXXXXXXX" style="text-transform:uppercase;"></div>
+    <div class="field"><label>Contact number</label><input id="trackPhone" placeholder="09XX XXX XXXX"></div>
+    <button class="checkoutbtn" id="trackBtn" onclick="checkOrderStatus()">Check status</button>
+    <div class="order-error" id="trackError"></div>
+    <div class="order-summary" id="trackResult" style="display:none;"></div>
   </div>
 </div>
 
@@ -370,6 +404,7 @@ try{
 
 let liveStock = {};  // flavorId -> current stock qty from the dashboard
 let livePrice = {};  // flavorId -> current price from the dashboard
+let liveLowThreshold = {};  // flavorId -> low-stock threshold from the dashboard
 
 function priceFor(id){
   if(livePrice[id] !== undefined) return livePrice[id];
@@ -383,13 +418,15 @@ function renderFlavorGrid(){
   FLAVORS.forEach(f=>{
     const stock = liveStock[f.id];
     const soldOut = stock !== undefined && stock <= 0;
+    const threshold = liveLowThreshold[f.id] != null ? liveLowThreshold[f.id] : 10;
+    const lowStock = !soldOut && stock !== undefined && stock <= threshold;
     const price = priceFor(f.id);
     const card = document.createElement('div');
     card.className = 'flavor-card' + (soldOut ? ' soldout' : '');
     card.style.setProperty('--fc', f.color);
     card.style.opacity = soldOut ? '0.6' : '';
     card.innerHTML = `
-      <span class="flavor-tag" style="background:${f.color}">Cocktail Kit</span>
+      <span class="flavor-tag" style="background:${f.color}">Cocktail Kit</span>${lowStock ? `<span class="urgency-badge">Only ${stock} left!</span>` : ''}
       <div class="jugwrap"><img src="${f.img}" alt="${f.name} Chug Jug PH cocktail kit"></div>
       <div class="flavor-code">${f.code}</div>
       <div class="flavor-name">${f.name}</div>
@@ -409,7 +446,7 @@ async function syncLiveCatalog(){
   if(!sbClient) return;
   try{
     const [{data:inv, error:invErr}, {data:prods, error:prodErr}] = await Promise.all([
-      sbClient.from('inventory').select('id,stock,price'),
+      sbClient.from('inventory').select('id,stock,price,lowThreshold'),
       sbClient.from('products').select('id,sellingPrice,active')
     ]);
     if(!invErr && inv){
@@ -417,6 +454,7 @@ async function syncLiveCatalog(){
         if(!FLAVORS.find(f=>f.id===row.id)) return;
         liveStock[row.id] = row.stock;
         if(row.price != null) livePrice[row.id] = row.price;
+        if(row.lowThreshold != null) liveLowThreshold[row.id] = row.lowThreshold;
       });
     }
     if(!prodErr && prods){
@@ -503,12 +541,18 @@ function openCart(){ document.getElementById('drawer').classList.add('open'); do
 function closeAll(){
   document.getElementById('drawer').classList.remove('open');
   document.getElementById('checkoutModal').classList.remove('open');
+  document.getElementById('trackModal').classList.remove('open');
   document.getElementById('overlay').classList.remove('open');
 }
 
-function openCheckout(){
+// A promo code is validated against the live promo_codes table (via the
+// validate_promo_code RPC — the storefront's anon key has no direct read
+// access to that table, only this narrow scoped check) and held here until
+// the order is actually placed, at which point it's redeemed server-side.
+let appliedPromo = null; // {code, discountType, discountValue, discountAmount}
+
+function renderOrderSummary(){
   const entries = Object.entries(cart);
-  if(entries.length === 0) return;
   let subtotal = 0;
   let lines = '';
   entries.forEach(([id,qty])=>{
@@ -517,8 +561,56 @@ function openCheckout(){
     subtotal += qty*price;
     lines += `<div><span>${f.name} × ${qty}</span><span>₱${(qty*price).toLocaleString()}</span></div>`;
   });
-  lines += `<div style="border-top:1px solid var(--line);margin-top:6px;padding-top:6px;font-weight:800;"><span>Total</span><span>₱${subtotal.toLocaleString()}</span></div>`;
+  let discountAmount = 0;
+  if(appliedPromo){
+    discountAmount = Math.min(appliedPromo.discountAmount, subtotal);
+    lines += `<div style="color:var(--lime);"><span>Promo (${appliedPromo.code})</span><span>−₱${discountAmount.toLocaleString()}</span></div>`;
+  }
+  lines += `<div style="border-top:1px solid var(--line);margin-top:6px;padding-top:6px;font-weight:800;"><span>Total</span><span>₱${(subtotal-discountAmount).toLocaleString()}</span></div>`;
   document.getElementById('orderSummary').innerHTML = lines;
+  return { subtotal, discountAmount };
+}
+
+async function applyPromoCode(){
+  const codeInput = document.getElementById('promoInput');
+  const code = codeInput.value.trim();
+  const promoMsg = document.getElementById('promoMsg');
+  if(!code){ promoMsg.textContent = 'Enter a code first.'; promoMsg.className = 'promo-msg err'; return; }
+  if(!sbClient){ promoMsg.textContent = "Couldn't reach our ordering system."; promoMsg.className = 'promo-msg err'; return; }
+  const { subtotal } = renderOrderSummary();
+  const btn = document.querySelector('.promo-apply-btn');
+  btn.disabled = true;
+  try{
+    const { data, error } = await sbClient.rpc('validate_promo_code', { p_code: code, p_subtotal: subtotal });
+    if(error) throw error;
+    if(data && data.valid){
+      appliedPromo = { code: data.code, discountType: data.discountType, discountValue: data.discountValue, discountAmount: data.discountAmount };
+      promoMsg.textContent = data.message;
+      promoMsg.className = 'promo-msg ok';
+    } else {
+      appliedPromo = null;
+      promoMsg.textContent = (data && data.message) || "That code isn't valid.";
+      promoMsg.className = 'promo-msg err';
+    }
+  }catch(e){
+    console.error('applyPromoCode failed', e);
+    appliedPromo = null;
+    promoMsg.textContent = 'Something went wrong checking that code. Please try again.';
+    promoMsg.className = 'promo-msg err';
+  } finally {
+    btn.disabled = false;
+    renderOrderSummary();
+  }
+}
+
+function openCheckout(){
+  if(Object.keys(cart).length === 0) return;
+  appliedPromo = null;
+  document.getElementById('promoInput').value = '';
+  const promoMsg = document.getElementById('promoMsg');
+  promoMsg.textContent = '';
+  promoMsg.className = 'promo-msg';
+  renderOrderSummary();
   document.getElementById('confirmMsg').classList.remove('show');
   document.getElementById('orderError').classList.remove('show');
   const placeBtn = document.getElementById('placeOrderBtn');
@@ -552,6 +644,8 @@ async function placeOrder(){
   });
   if(!items.length) return;
   const subtotal = items.reduce((s,it)=>s + it.qty*it.unitPrice, 0);
+  const discount = appliedPromo ? Math.min(appliedPromo.discountAmount, subtotal) : 0;
+  const promoCode = appliedPromo ? appliedPromo.code : null;
 
   if(!sbClient){
     errorEl.textContent = "Sorry, we couldn't reach our ordering system. Please try again in a moment.";
@@ -559,12 +653,16 @@ async function placeOrder(){
     return;
   }
 
+  // A reference number the customer can use with "Track your order" right
+  // away — before anyone on our end has even confirmed it.
+  const orderNo = 'WEB-' + Date.now().toString(36).toUpperCase();
+
   const btn = document.getElementById('placeOrderBtn');
   btn.disabled = true;
   btn.textContent = 'Placing order…';
   try{
     const { error } = await sbClient.from('online_orders').insert({
-      items, subtotal,
+      orderNo, items, subtotal, discount, promoCode,
       customerName: name,
       customerEmail: email,
       customerPhone: phone,
@@ -576,17 +674,102 @@ async function placeOrder(){
     });
     if(error) throw error;
 
+    if(promoCode){
+      // Best-effort: the order itself already went through either way, so a
+      // redemption-count hiccup here shouldn't block the customer.
+      sbClient.rpc('redeem_promo_code', { p_code: promoCode }).catch(e=>console.error('redeem_promo_code failed', e));
+    }
+
     cart = {};
+    appliedPromo = null;
     saveCart();
     renderCart();
     btn.textContent = 'Order placed ✓';
-    document.getElementById('confirmMsg').classList.add('show');
+    const confirmMsg = document.getElementById('confirmMsg');
+    confirmMsg.textContent = `Order placed! Your order number is ${orderNo} — save this to track your order. We'll confirm your payment and delivery shortly.`;
+    confirmMsg.classList.add('show');
   }catch(e){
     console.error('placeOrder failed', e);
     errorEl.textContent = 'Something went wrong placing your order. Please try again in a moment.';
     errorEl.classList.add('show');
     btn.disabled = false;
     btn.textContent = 'Place order';
+  }
+}
+
+function openTrackModal(){
+  closeMobileNav();
+  document.getElementById('trackError').classList.remove('show');
+  document.getElementById('trackResult').style.display = 'none';
+  document.getElementById('trackModal').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+}
+
+const TRACK_STATUS_TEXT = {
+  NEW: { label: 'Order received — awaiting confirmation', cls: 'warn' },
+  DECLINED: { label: 'This order was declined. Please contact us for help.', cls: 'err' },
+};
+async function checkOrderStatus(){
+  const orderNo = document.getElementById('trackOrderNo').value.trim();
+  const phone = document.getElementById('trackPhone').value.trim();
+  const errorEl = document.getElementById('trackError');
+  const resultEl = document.getElementById('trackResult');
+  errorEl.classList.remove('show');
+  resultEl.style.display = 'none';
+  if(!orderNo || !phone){
+    errorEl.textContent = 'Enter both your order number and contact number.';
+    errorEl.classList.add('show');
+    return;
+  }
+  if(!sbClient){
+    errorEl.textContent = "Sorry, we couldn't reach our ordering system. Please try again in a moment.";
+    errorEl.classList.add('show');
+    return;
+  }
+  const btn = document.getElementById('trackBtn');
+  btn.disabled = true;
+  btn.textContent = 'Checking…';
+  try{
+    const { data, error } = await sbClient.rpc('track_order', { p_order_no: orderNo, p_phone: phone });
+    if(error) throw error;
+    if(!data){
+      errorEl.textContent = "We couldn't find an order with that number and contact number. Double-check both and try again.";
+      errorEl.classList.add('show');
+      return;
+    }
+    let statusLabel, statusCls;
+    if(data.voided || data.orderStatus==='CANCELLED'){
+      statusLabel = 'This order was cancelled.'; statusCls = 'err';
+    } else if(data.orderStatus==='REFUNDED'){
+      statusLabel = 'This order was refunded.'; statusCls = 'err';
+    } else if(data.webStatus==='CONFIRMED'){
+      if(data.deliveryStatus==='DELIVERED'){ statusLabel = 'Delivered! Enjoy 🎉'; statusCls = 'ok'; }
+      else if(data.deliveryStatus==='OUT_FOR_DELIVERY'){ statusLabel = `Out for delivery${data.rider?' with '+data.rider:''}!`; statusCls = 'ok'; }
+      else if(data.deliveryStatus==='FAILED'){ statusLabel = "We attempted delivery but couldn't complete it — we'll reach out to reschedule."; statusCls = 'warn'; }
+      else { statusLabel = "Confirmed! We're preparing your order."; statusCls = 'ok'; }
+    } else {
+      const fallback = TRACK_STATUS_TEXT[data.webStatus] || { label: data.webStatus, cls: 'warn' };
+      statusLabel = fallback.label; statusCls = fallback.cls;
+    }
+    const items = data.items || [];
+    const itemsHtml = items.map(it=>`<div><span>${it.name||it.flavorId} × ${it.qty}</span><span>₱${((it.qty||0)*(it.unitPrice||0)).toLocaleString()}</span></div>`).join('');
+    const discountHtml = data.discount ? `<div style="color:var(--lime);"><span>Promo (${data.promoCode||''})</span><span>−₱${Number(data.discount).toLocaleString()}</span></div>` : '';
+    const when = data.placedAt ? new Date(data.placedAt).toLocaleString('en-PH',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}) : '';
+    resultEl.innerHTML = `
+      <div class="track-status ${statusCls}">${statusLabel}</div>
+      <div style="margin-bottom:10px;"><span>Order</span><span> ${data.orderNo} · ${when}</span></div>
+      ${itemsHtml}
+      ${discountHtml}
+      <div style="border-top:1px solid var(--line);margin-top:6px;padding-top:6px;font-weight:800;"><span>Total</span><span>₱${Math.max(0,(data.subtotal||0)-(data.discount||0)).toLocaleString()}</span></div>
+    `;
+    resultEl.style.display = 'block';
+  }catch(e){
+    console.error('checkOrderStatus failed', e);
+    errorEl.textContent = 'Something went wrong checking that order. Please try again in a moment.';
+    errorEl.classList.add('show');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Check status';
   }
 }
 const VIDEOS = [
