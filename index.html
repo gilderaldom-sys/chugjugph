@@ -102,6 +102,16 @@ header::after{content:'';display:block;height:2px;background:linear-gradient(90d
 .price{font-family:var(--mono);font-size:19px;color:#fff;font-weight:700;}
 .addbtn{background:rgba(255,255,255,.08);color:#fff;font-weight:800;font-size:12.5px;padding:10px 14px;border-radius:8px;border:1px solid var(--glass-border);transition:background .15s ease, border-color .15s ease;}
 .addbtn:hover{background:linear-gradient(135deg,var(--orange),var(--pink));border-color:transparent;}
+.notify-row{display:flex;flex-direction:column;gap:6px;width:100%;}
+.notify-form{display:flex;gap:6px;}
+.notify-form input{flex:1;min-width:0;background:rgba(255,255,255,.06);border:1px solid var(--glass-border);border-radius:8px;padding:9px 10px;color:#fff;font-size:12.5px;}
+.notify-form input::placeholder{color:rgba(255,243,214,.4);}
+.notify-btn{background:rgba(255,255,255,.08);color:#fff;font-weight:800;font-size:12px;padding:9px 12px;border-radius:8px;border:1px solid var(--glass-border);white-space:nowrap;}
+.notify-btn:hover{background:linear-gradient(135deg,var(--orange),var(--pink));border-color:transparent;}
+.notify-msg{font-size:11.5px;min-height:14px;}
+.notify-msg.ok{color:var(--lime);}
+.notify-msg.err{color:#ff9b9b;}
+.flavor-card.soldout .jugwrap,.flavor-card.soldout .flavor-name,.flavor-card.soldout .flavor-code,.flavor-card.soldout .flavor-tag,.flavor-card.soldout .flavor-contents{opacity:.5;}
 
 /* how it works */
 .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;}
@@ -430,7 +440,6 @@ function renderFlavorGrid(){
     const card = document.createElement('div');
     card.className = 'flavor-card' + (soldOut ? ' soldout' : '');
     card.style.setProperty('--fc', f.color);
-    card.style.opacity = soldOut ? '0.6' : '';
     card.innerHTML = `
       <span class="flavor-tag" style="background:${f.color}">Cocktail Kit</span>${lowStock ? `<span class="urgency-badge">Only ${stock} left!</span>` : ''}
       <div class="jugwrap"><img src="${f.img}" alt="${f.name} Chug Jug PH cocktail kit"></div>
@@ -440,9 +449,17 @@ function renderFlavorGrid(){
       <div class="flavor-foot">
         <span class="price">₱${price}</span>
         ${soldOut
-          ? `<button class="addbtn" disabled style="opacity:.5;cursor:not-allowed;">Sold out</button>`
+          ? `<span style="font-size:12.5px;font-weight:800;color:var(--orange);">Sold out</span>`
           : `<button class="addbtn" onclick="addToCart('${f.id}')">Add to cart</button>`}
-      </div>`;
+      </div>
+      ${soldOut ? `
+      <div class="notify-row">
+        <div class="notify-form">
+          <input type="text" id="notify-${f.id}" placeholder="Email or mobile number">
+          <button type="button" class="notify-btn" onclick="submitNotifyMe('${f.id}', '${f.name.replace(/'/g,"\\'")}')">Notify me</button>
+        </div>
+        <div class="notify-msg" id="notifyMsg-${f.id}"></div>
+      </div>` : ''}`;
     grid.appendChild(card);
   });
 }
@@ -606,6 +623,40 @@ async function applyPromoCode(){
   } finally {
     btn.disabled = false;
     renderOrderSummary();
+  }
+}
+
+// Lets a customer leave an email or PH mobile number against a sold-out
+// flavor so staff can reach out when it's back — captures demand instead of
+// just losing the visit.
+async function submitNotifyMe(flavorId, flavorName){
+  const input = document.getElementById('notify-'+flavorId);
+  const msgEl = document.getElementById('notifyMsg-'+flavorId);
+  const contact = input.value.trim();
+  if(!contact){ msgEl.textContent = 'Enter an email or mobile number first.'; msgEl.className = 'notify-msg err'; return; }
+  const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact);
+  const digits = contact.replace(/\D/g,'');
+  const isPhone = digits.length >= 10 && digits.length <= 13;
+  if(!isEmail && !isPhone){ msgEl.textContent = 'Enter a valid email or mobile number.'; msgEl.className = 'notify-msg err'; return; }
+  if(!sbClient){ msgEl.textContent = "Couldn't reach our ordering system."; msgEl.className = 'notify-msg err'; return; }
+  const btn = input.nextElementSibling;
+  btn.disabled = true;
+  try{
+    const { error } = await sbClient.from('stock_notify_requests').insert({
+      flavorId, flavorName, contact,
+      contactType: isEmail ? 'email' : 'phone',
+      notified: false, ts: Date.now()
+    });
+    if(error) throw error;
+    input.value = '';
+    msgEl.textContent = "We'll let you know when it's back!";
+    msgEl.className = 'notify-msg ok';
+  }catch(e){
+    console.error('submitNotifyMe failed', e);
+    msgEl.textContent = 'Something went wrong. Please try again.';
+    msgEl.className = 'notify-msg err';
+  } finally {
+    btn.disabled = false;
   }
 }
 
