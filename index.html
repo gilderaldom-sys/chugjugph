@@ -363,7 +363,13 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
       <div class="pay-box-title">Pay via GCash or Maya</div>
       <div class="pay-box-row"><span>GCash</span><strong id="gcashNumber">[Add your GCash number]</strong></div>
       <div class="pay-box-row"><span>Maya</span><strong id="mayaNumber">[Add your Maya number]</strong></div>
-      <div class="pay-box-note">Send the exact total above to either account, then tap Place order below. Keep your payment screenshot — our team will confirm it and reach out to arrange delivery.</div>
+      <div class="pay-box-note">Send the exact total above to either account, then tap Place order below.</div>
+    </div>
+
+    <div class="field">
+      <label>Payment screenshot (optional, speeds up confirmation)</label>
+      <input type="file" id="ordProofFile" accept="image/*">
+      <div class="promo-msg" id="proofMsg"></div>
     </div>
 
     <button class="checkoutbtn" id="placeOrderBtn" onclick="placeOrder()">Place order</button>
@@ -613,6 +619,10 @@ function openCheckout(){
   renderOrderSummary();
   document.getElementById('confirmMsg').classList.remove('show');
   document.getElementById('orderError').classList.remove('show');
+  const proofFileEl = document.getElementById('ordProofFile');
+  if(proofFileEl) proofFileEl.value = '';
+  const proofMsgEl = document.getElementById('proofMsg');
+  if(proofMsgEl) proofMsgEl.textContent = '';
   const placeBtn = document.getElementById('placeOrderBtn');
   placeBtn.disabled = false;
   placeBtn.textContent = 'Place order';
@@ -661,6 +671,26 @@ async function placeOrder(){
   btn.disabled = true;
   btn.textContent = 'Placing order…';
   try{
+    // Upload the payment screenshot first (if the customer attached one) so
+    // its storage path can be included on the order row. A failed upload
+    // never blocks the order itself — the customer still has the screenshot
+    // and our team can ask for it the old way.
+    let paymentProofPath = null;
+    const proofFile = document.getElementById('ordProofFile') && document.getElementById('ordProofFile').files[0];
+    const proofMsgEl = document.getElementById('proofMsg');
+    if(proofFile){
+      try{
+        const ext = (proofFile.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g,'') || 'jpg';
+        const path = `${orderNo}/${Date.now()}.${ext}`;
+        const { error: uploadErr } = await sbClient.storage.from('payment-proofs').upload(path, proofFile, { contentType: proofFile.type || 'image/jpeg' });
+        if(uploadErr) throw uploadErr;
+        paymentProofPath = path;
+      } catch(uploadEx){
+        console.error('payment proof upload failed', uploadEx);
+        if(proofMsgEl){ proofMsgEl.textContent = "Couldn't attach your screenshot, but we'll still place your order — keep it handy in case we ask."; proofMsgEl.className = 'promo-msg err'; }
+      }
+    }
+
     const { error } = await sbClient.from('online_orders').insert({
       orderNo, items, subtotal, discount, promoCode,
       customerName: name,
@@ -670,6 +700,7 @@ async function placeOrder(){
       notes: notes,
       status: 'NEW', source: 'website',
       paymentMethod: 'GCash/Maya QR', paymentStatus: 'UNPAID',
+      paymentProofPath,
       ts: Date.now()
     });
     if(error) throw error;
