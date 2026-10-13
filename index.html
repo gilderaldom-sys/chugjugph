@@ -384,8 +384,8 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
 
     <div class="pay-box">
       <div class="pay-box-title">Pay via GCash or Maya</div>
-      <div class="pay-box-row"><span>GCash</span><strong id="gcashNumber">[Add your GCash number]</strong></div>
-      <div class="pay-box-row"><span>Maya</span><strong id="mayaNumber">[Add your Maya number]</strong></div>
+      <div class="pay-box-row"><span>GCash</span><strong id="gcashNumber">Loading…</strong></div>
+      <div class="pay-box-row" id="mayaRow" style="display:none;"><span>Maya</span><strong id="mayaNumber"></strong></div>
       <div class="pay-box-note">Send the exact total above to either account, then tap Place order below.</div>
     </div>
 
@@ -510,6 +510,41 @@ async function syncLiveCatalog(){
   }catch(e){ console.error('syncLiveCatalog failed', e); }
 }
 syncLiveCatalog();
+
+// Loads the GCash/Maya numbers to show at checkout from the dashboard's
+// Finance settings (settings/payment), so the business can update them
+// anytime without a code change. Falls back to a "contact us" message if
+// nothing is configured yet or the fetch fails, rather than showing a
+// broken-looking placeholder.
+async function syncPaymentDetails(){
+  const gcashEl = document.getElementById('gcashNumber');
+  const mayaRow = document.getElementById('mayaRow');
+  const mayaEl = document.getElementById('mayaNumber');
+  const titleEl = document.querySelector('.pay-box-title');
+  if(!sbClient) return;
+  try{
+    const { data, error } = await sbClient.from('settings').select('gcashNumber,gcashName,mayaNumber,mayaName').eq('id','payment').maybeSingle();
+    if(error) throw error;
+    if(data && data.gcashNumber){
+      gcashEl.textContent = `${data.gcashNumber}${data.gcashName ? ' ('+data.gcashName+')' : ''}`;
+    } else {
+      gcashEl.textContent = 'Message us to pay';
+    }
+    if(data && data.mayaNumber){
+      mayaEl.textContent = `${data.mayaNumber}${data.mayaName ? ' ('+data.mayaName+')' : ''}`;
+      if(mayaRow) mayaRow.style.display = '';
+      if(titleEl) titleEl.textContent = 'Pay via GCash or Maya';
+    } else {
+      if(mayaRow) mayaRow.style.display = 'none';
+      if(titleEl) titleEl.textContent = 'Pay via GCash';
+    }
+  }catch(e){
+    console.error('syncPaymentDetails failed', e);
+    if(gcashEl) gcashEl.textContent = 'Message us to pay';
+    if(mayaRow) mayaRow.style.display = 'none';
+  }
+}
+syncPaymentDetails();
 
 let cart = {};
 try{
