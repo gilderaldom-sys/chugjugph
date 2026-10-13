@@ -555,6 +555,53 @@ try{
 function saveCart(){
   try{ localStorage.setItem('chugjug_cart', JSON.stringify(cart)); }catch(e){}
 }
+
+// A stable per-browser id (not tied to any order) so repeated abandoned-cart
+// captures from the same visitor upsert the same row instead of spawning a
+// new one every time they re-open checkout or switch tabs.
+let cartSessionId = null;
+try{
+  cartSessionId = localStorage.getItem('chugjug_cart_session');
+  if(!cartSessionId){
+    cartSessionId = 'cart-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);
+    localStorage.setItem('chugjug_cart_session', cartSessionId);
+  }
+}catch(e){ cartSessionId = 'cart-' + Date.now().toString(36); }
+
+// Captures (or updates) a lead for staff to follow up on: only fires once
+// contact info exists (name/email/phone typed into checkout) — an empty
+// cart with no contact info isn't actionable, so we don't bother staff with
+// it. Dedupes against the last payload sent so idle tab-switching doesn't
+// spam writes.
+let lastAbandonedCapturePayload = null;
+async function captureAbandonedCart(){
+  if(!sbClient || !cartSessionId) return;
+  const entries = Object.entries(cart);
+  if(!entries.length) return;
+  const nameEl = document.getElementById('ordName');
+  const emailEl = document.getElementById('ordEmail');
+  const phoneEl = document.getElementById('ordPhone');
+  const customerName = nameEl ? nameEl.value.trim() : '';
+  const customerEmail = emailEl ? emailEl.value.trim() : '';
+  const customerPhone = phoneEl ? phoneEl.value.trim() : '';
+  if(!customerEmail && !customerPhone) return; // nothing to follow up with
+  const items = entries.map(([id,qty])=>{
+    const f = FLAVORS.find(x=>x.id===id) || {};
+    return { flavorId:id, name:f.name||id, qty, unitPrice: priceFor(id) };
+  });
+  const subtotal = items.reduce((s,it)=>s + it.qty*it.unitPrice, 0);
+  const payload = { id: cartSessionId, items, subtotal, customerName, customerEmail, customerPhone, status:'abandoned', ts: Date.now() };
+  const dedupeKey = JSON.stringify({ items, customerName, customerEmail, customerPhone });
+  if(dedupeKey === lastAbandonedCapturePayload) return;
+  try{
+    const { error } = await sbClient.from('abandoned_carts').upsert({ ...payload, createdAt: Date.now() });
+    if(error) throw error;
+    lastAbandonedCapturePayload = dedupeKey;
+  }catch(e){ console.error('captureAbandonedCart failed', e); }
+}
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden) captureAbandonedCart();
+});
 function addToCart(id){
   const stock = liveStock[id];
   if(stock !== undefined && stock <= 0) return;
@@ -610,10 +657,16 @@ function toggleMobileNav(){ document.getElementById('mobileNav').classList.toggl
 function closeMobileNav(){ document.getElementById('mobileNav').classList.remove('open'); }
 function openCart(){ document.getElementById('drawer').classList.add('open'); document.getElementById('overlay').classList.add('open'); closeMobileNav(); }
 function closeAll(){
+  const checkoutWasOpen = document.getElementById('checkoutModal').classList.contains('open');
   document.getElementById('drawer').classList.remove('open');
   document.getElementById('checkoutModal').classList.remove('open');
   document.getElementById('trackModal').classList.remove('open');
   document.getElementById('overlay').classList.remove('open');
+  // Closing checkout without placing the order: if they'd already typed a
+  // way to reach them, save the lead for a follow-up (a cart emptied by a
+  // successful order fails the "cart non-empty" check in captureAbandonedCart,
+  // so this never fires for a completed purchase).
+  if(checkoutWasOpen) captureAbandonedCart();
 }
 
 // A promo code is validated against the live promo_codes table (via the
@@ -809,6 +862,12 @@ async function placeOrder(){
       // redemption-count hiccup here shouldn't block the customer.
       sbClient.rpc('redeem_promo_code', { p_code: promoCode }).catch(e=>console.error('redeem_promo_code failed', e));
     }
+
+    // Best-effort: if this session had previously been captured as an
+    // abandoned cart, flip it to recovered so it drops off the staff
+    // follow-up list. A no-op (0 rows affected, no error) if it was never
+    // captured in the first place.
+    sbClient.from('abandoned_carts').update({ status:'recovered', recoveredOrderNo: orderNo, ts: Date.now() }).eq('id', cartSessionId).then(({error})=>{ if(error) console.error('mark cart recovered failed', error); });
 
     cart = {};
     appliedPromo = null;
