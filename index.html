@@ -125,6 +125,8 @@ header::after{content:'';display:block;height:2px;background:linear-gradient(90d
 .notify-msg.ok{color:var(--lime);}
 .notify-msg.err{color:#ff9b9b;}
 .flavor-card.soldout .jugwrap,.flavor-card.soldout .flavor-name,.flavor-card.soldout .flavor-code,.flavor-card.soldout .flavor-tag,.flavor-card.soldout .flavor-contents{opacity:.5;}
+.bundle-banner{max-width:1120px;margin:0 auto 20px;padding:14px 18px;border-radius:12px;background:linear-gradient(135deg,rgba(184,224,47,.14),rgba(255,107,53,.1));border:1px solid var(--lime);display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:#fff;font-weight:700;font-size:14px;}
+.bundle-banner strong{color:var(--lime);}
 
 /* how it works */
 .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;}
@@ -177,6 +179,7 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
 .qty span{min-width:14px;text-align:center;font-weight:700;font-size:13px;font-family:var(--mono);}
 .drawer-foot{padding:18px 20px;border-top:1px solid var(--glass-border);}
 .subtotal{display:flex;justify-content:space-between;font-weight:800;font-size:16px;margin-bottom:12px;font-family:var(--mono);color:#fff;}
+.bundle-savings{display:none;justify-content:space-between;font-weight:700;font-size:13px;margin-bottom:8px;color:var(--lime);font-family:var(--mono);}
 .checkoutbtn{width:100%;background:linear-gradient(135deg,var(--orange),var(--pink));color:#fff;font-weight:800;padding:14px;border-radius:9px;font-size:15px;box-shadow:0 8px 24px rgba(255,63,129,.28);}
 .checkoutbtn:disabled{opacity:.3;cursor:not-allowed;box-shadow:none;}
 
@@ -294,6 +297,7 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
       <h2 class="display">Pick your flavor.</h2>
       <p>Five jugs, five personalities. Each one serves 6–8 and comes fully stocked — nothing else to buy.</p>
     </div>
+    <div class="bundle-banner" id="bundleBanner" style="display:none;"></div>
     <div class="flavor-grid" id="flavorGrid"></div>
   </div>
 </section>
@@ -358,6 +362,7 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
   </div>
   <div class="cart-items" id="cartItems"></div>
   <div class="drawer-foot">
+    <div class="bundle-savings" id="bundleSavingsLine"></div>
     <div class="subtotal"><span>Subtotal</span><span id="subtotal">₱0</span></div>
     <button class="checkoutbtn" id="checkoutBtn" onclick="openCheckout()" disabled>Checkout</button>
   </div>
@@ -434,11 +439,60 @@ try{
 let liveStock = {};  // flavorId -> current stock qty from the dashboard
 let livePrice = {};  // flavorId -> current price from the dashboard
 let liveLowThreshold = {};  // flavorId -> low-stock threshold from the dashboard
+let activeBundle = null;  // {active, jugCount, price, name, description} from settings/bundle, or null
 
 function priceFor(id){
   if(livePrice[id] !== undefined) return livePrice[id];
   const f = FLAVORS.find(x=>x.id===id);
   return f ? f.price : 0;
+}
+
+// Automatically applies the configured party-pack deal to whatever's in the
+// cart: every complete group of `jugCount` units (any flavor mix, cheapest
+// units kept at regular price) is charged the flat bundle price instead of
+// the sum of its per-jug prices. Units are sorted priciest-first so the
+// discount always lands on the most expensive jugs — the most generous,
+// deterministic reading when flavors are priced differently. A misconfigured
+// bundle (flat price not actually cheaper than the jugs it covers) never
+// charges more than regular pricing for that group.
+function computeBundlePricing(cartObj){
+  const entries = Object.entries(cartObj || {});
+  const units = [];
+  entries.forEach(([id,qty])=>{
+    const price = priceFor(id);
+    for(let i=0;i<qty;i++) units.push(price);
+  });
+  const regularSubtotal = units.reduce((s,p)=>s+p,0);
+  const bundle = activeBundle;
+  if(!bundle || !bundle.active || !bundle.jugCount || bundle.jugCount < 1 || !bundle.price){
+    return { regularSubtotal, payableSubtotal: regularSubtotal, bundleSavings: 0, groupsApplied: 0 };
+  }
+  units.sort((a,b)=>b-a);
+  const groups = Math.floor(units.length / bundle.jugCount);
+  let payableSubtotal = 0, bundleSavings = 0, groupsApplied = 0;
+  for(let g=0; g<groups; g++){
+    const slice = units.slice(g*bundle.jugCount, (g+1)*bundle.jugCount);
+    const regular = slice.reduce((s,p)=>s+p,0);
+    if(bundle.price < regular){
+      payableSubtotal += bundle.price;
+      bundleSavings += (regular - bundle.price);
+      groupsApplied++;
+    } else {
+      payableSubtotal += regular;
+    }
+  }
+  const remainder = units.slice(groups*bundle.jugCount);
+  payableSubtotal += remainder.reduce((s,p)=>s+p,0);
+  return { regularSubtotal, payableSubtotal, bundleSavings, groupsApplied };
+}
+
+function renderBundleBanner(){
+  const el = document.getElementById('bundleBanner');
+  if(!el) return;
+  const bundle = activeBundle;
+  if(!bundle || !bundle.active || !bundle.jugCount || !bundle.price){ el.style.display = 'none'; el.innerHTML=''; return; }
+  el.style.display = 'flex';
+  el.innerHTML = `🎉 <strong>${bundle.name || 'Party Pack'}:</strong> any ${bundle.jugCount} jugs for ₱${Number(bundle.price).toLocaleString()} — automatically applied at checkout.${bundle.description ? ` <span style="font-weight:500;opacity:.85;">${bundle.description}</span>` : ''}`;
 }
 
 const grid = document.getElementById('flavorGrid');
@@ -546,6 +600,31 @@ async function syncPaymentDetails(){
 }
 syncPaymentDetails();
 
+// Loads the active party-pack deal (settings/bundle) so it can be shown as a
+// banner and applied automatically to cart pricing. Fetched once at page
+// load, same as payment details — the dashboard writes to this row directly,
+// so a page refresh is enough to pick up a change.
+async function syncBundleDeal(){
+  if(!sbClient) return;
+  try{
+    const { data, error } = await sbClient.from('settings').select('bundleActive,bundleJugCount,bundlePrice,bundleName,bundleDescription').eq('id','bundle').maybeSingle();
+    if(error) throw error;
+    activeBundle = data ? {
+      active: !!data.bundleActive,
+      jugCount: data.bundleJugCount,
+      price: data.bundlePrice,
+      name: data.bundleName,
+      description: data.bundleDescription
+    } : null;
+  }catch(e){
+    console.error('syncBundleDeal failed', e);
+    activeBundle = null;
+  }
+  renderBundleBanner();
+  renderCart();
+}
+syncBundleDeal();
+
 let cart = {};
 try{
   const saved = localStorage.getItem('chugjug_cart');
@@ -621,14 +700,14 @@ function changeQty(id, delta){
 function renderCart(){
   const itemsEl = document.getElementById('cartItems');
   const entries = Object.entries(cart);
-  let count = 0, subtotal = 0;
+  let count = 0;
   if(entries.length === 0){
     itemsEl.innerHTML = '<div class="cart-empty">Your jug is empty. Add a flavor to get started.</div>';
   } else {
     itemsEl.innerHTML = entries.map(([id,qty])=>{
       const f = FLAVORS.find(x=>x.id===id);
       const price = priceFor(id);
-      count += qty; subtotal += qty * price;
+      count += qty;
       return `<div class="cart-item">
         <img class="dot" src="${f.img}" alt="${f.name}">
         <div><div class="ci-name">${f.name}</div><div class="ci-price">₱${price} each</div></div>
@@ -640,9 +719,20 @@ function renderCart(){
       </div>`;
     }).join('');
   }
+  const { payableSubtotal, bundleSavings, groupsApplied } = computeBundlePricing(cart);
   document.getElementById('cartCount').textContent = count;
-  document.getElementById('subtotal').textContent = '₱' + subtotal.toLocaleString();
+  document.getElementById('subtotal').textContent = '₱' + payableSubtotal.toLocaleString();
   document.getElementById('checkoutBtn').disabled = count === 0;
+  const savingsEl = document.getElementById('bundleSavingsLine');
+  if(savingsEl){
+    if(bundleSavings > 0){
+      savingsEl.style.display = 'flex';
+      savingsEl.innerHTML = `<span>${(activeBundle&&activeBundle.name)||'Party Pack'} ×${groupsApplied}</span><span>−₱${bundleSavings.toLocaleString()}</span>`;
+    } else {
+      savingsEl.style.display = 'none';
+      savingsEl.innerHTML = '';
+    }
+  }
 }
 renderCart();
 
@@ -677,22 +767,24 @@ let appliedPromo = null; // {code, discountType, discountValue, discountAmount}
 
 function renderOrderSummary(){
   const entries = Object.entries(cart);
-  let subtotal = 0;
   let lines = '';
   entries.forEach(([id,qty])=>{
     const f = FLAVORS.find(x=>x.id===id);
     const price = priceFor(id);
-    subtotal += qty*price;
     lines += `<div><span>${f.name} × ${qty}</span><span>₱${(qty*price).toLocaleString()}</span></div>`;
   });
+  const { payableSubtotal, bundleSavings, groupsApplied } = computeBundlePricing(cart);
+  if(bundleSavings > 0){
+    lines += `<div style="color:var(--lime);"><span>${(activeBundle&&activeBundle.name)||'Party Pack'} ×${groupsApplied}</span><span>−₱${bundleSavings.toLocaleString()}</span></div>`;
+  }
   let discountAmount = 0;
   if(appliedPromo){
-    discountAmount = Math.min(appliedPromo.discountAmount, subtotal);
+    discountAmount = Math.min(appliedPromo.discountAmount, payableSubtotal);
     lines += `<div style="color:var(--lime);"><span>Promo (${appliedPromo.code})</span><span>−₱${discountAmount.toLocaleString()}</span></div>`;
   }
-  lines += `<div style="border-top:1px solid var(--line);margin-top:6px;padding-top:6px;font-weight:800;"><span>Total</span><span>₱${(subtotal-discountAmount).toLocaleString()}</span></div>`;
+  lines += `<div style="border-top:1px solid var(--line);margin-top:6px;padding-top:6px;font-weight:800;"><span>Total</span><span>₱${(payableSubtotal-discountAmount).toLocaleString()}</span></div>`;
   document.getElementById('orderSummary').innerHTML = lines;
-  return { subtotal, discountAmount };
+  return { subtotal: payableSubtotal, discountAmount, bundleSavings };
 }
 
 async function applyPromoCode(){
@@ -805,7 +897,7 @@ async function placeOrder(){
     return { flavorId:id, name:f.name||id, qty, unitPrice: priceFor(id) };
   });
   if(!items.length) return;
-  const subtotal = items.reduce((s,it)=>s + it.qty*it.unitPrice, 0);
+  const { payableSubtotal: subtotal, bundleSavings: bundleDiscount } = computeBundlePricing(cart);
   const discount = appliedPromo ? Math.min(appliedPromo.discountAmount, subtotal) : 0;
   const promoCode = appliedPromo ? appliedPromo.code : null;
 
@@ -844,7 +936,7 @@ async function placeOrder(){
     }
 
     const { error } = await sbClient.from('online_orders').insert({
-      orderNo, items, subtotal, discount, promoCode,
+      orderNo, items, subtotal, discount, promoCode, bundleDiscount: bundleDiscount || null,
       customerName: name,
       customerEmail: email,
       customerPhone: phone,
