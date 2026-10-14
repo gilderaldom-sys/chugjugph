@@ -298,6 +298,7 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
       <p>Five jugs, five personalities. Each one serves 6–8 and comes fully stocked — nothing else to buy.</p>
     </div>
     <div class="bundle-banner" id="bundleBanner" style="display:none;"></div>
+    <div class="bundle-banner" id="referralBanner" style="display:none;border-color:var(--pink);"></div>
     <div class="flavor-grid" id="flavorGrid"></div>
   </div>
 </section>
@@ -384,6 +385,14 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
     <div class="field"><label>Full name</label><input id="ordName" placeholder="Juan Dela Cruz"></div>
     <div class="field"><label>Email address</label><input id="ordEmail" type="email" placeholder="juan@email.com"></div>
     <div class="field"><label>Contact number</label><input id="ordPhone" placeholder="09XX XXX XXXX"></div>
+    <div class="field" id="referralField" style="display:none;">
+      <label>Referral code (optional)</label>
+      <div class="promo-row">
+        <input id="referralInput" placeholder="e.g. REF-AB12C" style="text-transform:uppercase;">
+        <button type="button" class="promo-apply-btn" onclick="applyReferralCode()">Apply</button>
+      </div>
+      <div class="promo-msg" id="referralMsg"></div>
+    </div>
     <div class="field"><label>Delivery address</label><textarea id="ordAddress" placeholder="House/unit, street, barangay, city"></textarea></div>
     <div class="field"><label>Notes (optional)</label><input id="ordNotes" placeholder="Preferred delivery time, etc."></div>
 
@@ -440,6 +449,7 @@ let liveStock = {};  // flavorId -> current stock qty from the dashboard
 let livePrice = {};  // flavorId -> current price from the dashboard
 let liveLowThreshold = {};  // flavorId -> low-stock threshold from the dashboard
 let activeBundle = null;  // {active, jugCount, price, name, description} from settings/bundle, or null
+let activeReferral = null;  // {active, refereeDiscount, referrerReward} from settings/referral, or null
 
 function priceFor(id){
   if(livePrice[id] !== undefined) return livePrice[id];
@@ -625,6 +635,38 @@ async function syncBundleDeal(){
 }
 syncBundleDeal();
 
+// Loads the referral program's on/off state and reward amounts so the
+// referral field at checkout (and its teaser banner) can show or hide
+// itself — fetched once at page load, same as the other settings rows.
+async function syncReferralDeal(){
+  if(!sbClient) return;
+  try{
+    const { data, error } = await sbClient.from('settings').select('referralActive,refereeDiscount,referrerReward').eq('id','referral').maybeSingle();
+    if(error) throw error;
+    activeReferral = data ? {
+      active: !!data.referralActive,
+      refereeDiscount: data.refereeDiscount,
+      referrerReward: data.referrerReward
+    } : null;
+  }catch(e){
+    console.error('syncReferralDeal failed', e);
+    activeReferral = null;
+  }
+  const field = document.getElementById('referralField');
+  if(field) field.style.display = (activeReferral && activeReferral.active) ? '' : 'none';
+  const banner = document.getElementById('referralBanner');
+  if(banner){
+    if(activeReferral && activeReferral.active && activeReferral.refereeDiscount){
+      banner.style.display = 'flex';
+      banner.innerHTML = `👯 <strong>Refer a friend:</strong> they get ₱${Number(activeReferral.refereeDiscount).toLocaleString()} off their first order${activeReferral.referrerReward ? `, you get ₱${Number(activeReferral.referrerReward).toLocaleString()} after it ships` : ''} — your code shows up after you order.`;
+    } else {
+      banner.style.display = 'none';
+      banner.innerHTML = '';
+    }
+  }
+}
+syncReferralDeal();
+
 let cart = {};
 try{
   const saved = localStorage.getItem('chugjug_cart');
@@ -764,6 +806,7 @@ function closeAll(){
 // access to that table, only this narrow scoped check) and held here until
 // the order is actually placed, at which point it's redeemed server-side.
 let appliedPromo = null; // {code, discountType, discountValue, discountAmount}
+let appliedReferral = null; // {code, ownerName, discountAmount}
 
 function renderOrderSummary(){
   const entries = Object.entries(cart);
@@ -782,9 +825,15 @@ function renderOrderSummary(){
     discountAmount = Math.min(appliedPromo.discountAmount, payableSubtotal);
     lines += `<div style="color:var(--lime);"><span>Promo (${appliedPromo.code})</span><span>−₱${discountAmount.toLocaleString()}</span></div>`;
   }
-  lines += `<div style="border-top:1px solid var(--line);margin-top:6px;padding-top:6px;font-weight:800;"><span>Total</span><span>₱${(payableSubtotal-discountAmount).toLocaleString()}</span></div>`;
+  let referralDiscountAmount = 0;
+  if(appliedReferral){
+    referralDiscountAmount = Math.min(appliedReferral.discountAmount, Math.max(0, payableSubtotal-discountAmount));
+    lines += `<div style="color:var(--lime);"><span>Referral (${appliedReferral.code})</span><span>−₱${referralDiscountAmount.toLocaleString()}</span></div>`;
+  }
+  const grandTotal = Math.max(0, payableSubtotal-discountAmount-referralDiscountAmount);
+  lines += `<div style="border-top:1px solid var(--line);margin-top:6px;padding-top:6px;font-weight:800;"><span>Total</span><span>₱${grandTotal.toLocaleString()}</span></div>`;
   document.getElementById('orderSummary').innerHTML = lines;
-  return { subtotal: payableSubtotal, discountAmount, bundleSavings };
+  return { subtotal: payableSubtotal, discountAmount, referralDiscountAmount, bundleSavings };
 }
 
 async function applyPromoCode(){
@@ -813,6 +862,42 @@ async function applyPromoCode(){
     appliedPromo = null;
     promoMsg.textContent = 'Something went wrong checking that code. Please try again.';
     promoMsg.className = 'promo-msg err';
+  } finally {
+    btn.disabled = false;
+    renderOrderSummary();
+  }
+}
+
+// Mirrors applyPromoCode, but a referral code needs the referred customer's
+// phone number up front (it's how we block self-referral and repeat use),
+// so this is read from the checkout form rather than being free-standing.
+async function applyReferralCode(){
+  const codeInput = document.getElementById('referralInput');
+  const code = codeInput.value.trim();
+  const referralMsg = document.getElementById('referralMsg');
+  const phone = (document.getElementById('ordPhone')||{}).value ? document.getElementById('ordPhone').value.trim() : '';
+  if(!code){ referralMsg.textContent = 'Enter a code first.'; referralMsg.className = 'promo-msg err'; return; }
+  if(!phone){ referralMsg.textContent = 'Enter your contact number above first.'; referralMsg.className = 'promo-msg err'; return; }
+  if(!sbClient){ referralMsg.textContent = "Couldn't reach our ordering system."; referralMsg.className = 'promo-msg err'; return; }
+  const btn = codeInput.nextElementSibling;
+  btn.disabled = true;
+  try{
+    const { data, error } = await sbClient.rpc('validate_referral_code', { p_code: code, p_referred_phone: phone });
+    if(error) throw error;
+    if(data && data.valid){
+      appliedReferral = { code: data.code, ownerName: data.ownerName, discountAmount: data.discountAmount };
+      referralMsg.textContent = data.message;
+      referralMsg.className = 'promo-msg ok';
+    } else {
+      appliedReferral = null;
+      referralMsg.textContent = (data && data.message) || "That referral code isn't valid.";
+      referralMsg.className = 'promo-msg err';
+    }
+  }catch(e){
+    console.error('applyReferralCode failed', e);
+    appliedReferral = null;
+    referralMsg.textContent = 'Something went wrong checking that code. Please try again.';
+    referralMsg.className = 'promo-msg err';
   } finally {
     btn.disabled = false;
     renderOrderSummary();
@@ -860,6 +945,11 @@ function openCheckout(){
   const promoMsg = document.getElementById('promoMsg');
   promoMsg.textContent = '';
   promoMsg.className = 'promo-msg';
+  appliedReferral = null;
+  const referralInputEl = document.getElementById('referralInput');
+  if(referralInputEl) referralInputEl.value = '';
+  const referralMsg = document.getElementById('referralMsg');
+  if(referralMsg){ referralMsg.textContent = ''; referralMsg.className = 'promo-msg'; }
   renderOrderSummary();
   document.getElementById('confirmMsg').classList.remove('show');
   document.getElementById('orderError').classList.remove('show');
@@ -900,6 +990,8 @@ async function placeOrder(){
   const { payableSubtotal: subtotal, bundleSavings: bundleDiscount } = computeBundlePricing(cart);
   const discount = appliedPromo ? Math.min(appliedPromo.discountAmount, subtotal) : 0;
   const promoCode = appliedPromo ? appliedPromo.code : null;
+  const referralDiscount = appliedReferral ? Math.min(appliedReferral.discountAmount, Math.max(0, subtotal-discount)) : 0;
+  const referralCode = appliedReferral ? appliedReferral.code : null;
 
   if(!sbClient){
     errorEl.textContent = "Sorry, we couldn't reach our ordering system. Please try again in a moment.";
@@ -937,6 +1029,7 @@ async function placeOrder(){
 
     const { error } = await sbClient.from('online_orders').insert({
       orderNo, items, subtotal, discount, promoCode, bundleDiscount: bundleDiscount || null,
+      referralCode, referralDiscount: referralDiscount || null,
       customerName: name,
       customerEmail: email,
       customerPhone: phone,
@@ -954,6 +1047,12 @@ async function placeOrder(){
       // redemption-count hiccup here shouldn't block the customer.
       sbClient.rpc('redeem_promo_code', { p_code: promoCode }).catch(e=>console.error('redeem_promo_code failed', e));
     }
+    if(referralCode){
+      // Logs the redemption so staff can see it in the rewards queue and pay
+      // the referrer out. Best-effort, same reasoning as the promo redeem
+      // above — the order already went through regardless.
+      sbClient.rpc('redeem_referral', { p_code: referralCode, p_referred_name: name, p_referred_phone: phone, p_order_no: orderNo }).catch(e=>console.error('redeem_referral failed', e));
+    }
 
     // Best-effort: if this session had previously been captured as an
     // abandoned cart, flip it to recovered so it drops off the staff
@@ -963,12 +1062,26 @@ async function placeOrder(){
 
     cart = {};
     appliedPromo = null;
+    appliedReferral = null;
     saveCart();
     renderCart();
     btn.textContent = 'Order placed ✓';
     const confirmMsg = document.getElementById('confirmMsg');
     confirmMsg.textContent = `Order placed! Your order number is ${orderNo} — save this to track your order. We'll confirm your payment and delivery shortly.`;
     confirmMsg.classList.add('show');
+
+    // Hand the customer their own shareable referral code once the order is
+    // in, so the loop (order -> share -> friend orders -> both rewarded) has
+    // something concrete to act on right away. Best-effort and non-blocking
+    // — a failure here shouldn't take away from an order that already
+    // succeeded.
+    if(activeReferral && activeReferral.active && phone){
+      sbClient.rpc('get_or_create_referral_code', { p_phone: phone, p_name: name }).then(({data: ownCode, error: codeErr})=>{
+        if(codeErr || !ownCode) { if(codeErr) console.error('get_or_create_referral_code failed', codeErr); return; }
+        const rewardNote = activeReferral.referrerReward ? `₱${Number(activeReferral.referrerReward).toLocaleString()}` : 'a reward';
+        confirmMsg.innerHTML = `${confirmMsg.textContent}<br><br>🎉 Your referral code is <strong>${ownCode}</strong> — share it with a friend and you'll both get rewarded (they save now, you get ${rewardNote} after their order).`;
+      }).catch(e=>console.error('get_or_create_referral_code failed', e));
+    }
   }catch(e){
     console.error('placeOrder failed', e);
     errorEl.textContent = 'Something went wrong placing your order. Please try again in a moment.';
