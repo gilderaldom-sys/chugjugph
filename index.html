@@ -137,6 +137,9 @@ header::after{content:'';display:block;height:2px;background:linear-gradient(90d
 
 /* finale */
 .chip{background:var(--glass);border:1px solid var(--glass-border);padding:7px 13px;border-radius:20px;font-family:var(--mono);font-size:11.5px;color:rgba(255,243,214,.75);}
+.trust-row{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:18px 0 4px;}
+.trust-row .chip{display:flex;align-items:center;gap:6px;}
+@media (max-width:559px){ .trust-row{gap:8px;} .trust-row .chip{font-size:11px;padding:6px 11px;} }
 
 /* finale */
 .finale{position:relative;text-align:center;padding:140px 0 120px;overflow:hidden;}
@@ -298,6 +301,12 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
       <span class="kicker">what's on tap</span>
       <h2 class="display">Pick your flavor.</h2>
       <p>Five jugs, five personalities. Each one serves 6–8 and comes fully stocked — nothing else to buy.</p>
+      <div class="trust-row">
+        <span class="chip">🔒 Secure GCash / Maya payment</span>
+        <span class="chip">📍 Metro Manila delivery</span>
+        <span class="chip">🎉 Nothing else to buy</span>
+        <span class="chip">👥 Serves 6–8 per jug</span>
+      </div>
     </div>
     <div class="bundle-banner" id="bundleBanner" style="display:none;"></div>
     <div class="bundle-banner" id="referralBanner" style="display:none;border-color:var(--pink);"></div>
