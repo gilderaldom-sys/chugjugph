@@ -128,6 +128,8 @@ header::after{content:'';display:block;height:2px;background:linear-gradient(90d
 .flavor-card.soldout .jugwrap,.flavor-card.soldout .flavor-name,.flavor-card.soldout .flavor-code,.flavor-card.soldout .flavor-tag,.flavor-card.soldout .flavor-contents{opacity:.5;}
 .bundle-banner{max-width:1120px;margin:0 auto 20px;padding:14px 18px;border-radius:12px;background:linear-gradient(135deg,rgba(184,224,47,.14),rgba(255,107,53,.1));border:1px solid var(--lime);display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:#fff;font-weight:700;font-size:14px;}
 .bundle-banner strong{color:var(--lime);}
+.referral-banner{background:linear-gradient(135deg,rgba(255,63,129,.16),rgba(139,92,246,.12));border-color:var(--pink);}
+.referral-banner strong{color:var(--pink);}
 
 /* how it works */
 .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;}
@@ -309,7 +311,7 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
       </div>
     </div>
     <div class="bundle-banner" id="bundleBanner" style="display:none;"></div>
-    <div class="bundle-banner" id="referralBanner" style="display:none;border-color:var(--pink);"></div>
+    <div class="bundle-banner referral-banner" id="referralBanner" style="display:none;"></div>
     <div class="flavor-grid" id="flavorGrid"></div>
   </div>
 </section>
