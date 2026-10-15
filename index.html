@@ -331,7 +331,7 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
 /* how it works: pinned scroll-scrubbed scene */
 .how-scroll{display:none;}
 .how.how-pinned .steps{display:none;}
-.how.how-pinned .how-scroll{display:block;height:340vh;position:relative;}
+.how.how-pinned .how-scroll{display:block;height:380vh;position:relative;}
 .how-stage{position:sticky;top:calc(var(--header-h) + env(safe-area-inset-top,0px) + 8px);height:calc(100vh - var(--header-h) - 24px);min-height:460px;max-height:660px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
 .how-visual{position:relative;width:min(520px,100%,calc((100vh - var(--header-h) - 250px) * 1.238));min-width:300px;aspect-ratio:520/420;margin:0;transform:translateX(23%);}
 .how-visual > *{position:absolute;}
@@ -1834,7 +1834,10 @@ VIDEOS.forEach(v=>vgrid.appendChild(makeVideoCard(v)));
     const stg = scroller.firstElementChild;
     const pinTop = parseFloat(getComputedStyle(stg).top) || 0;
     const total = Math.max(1, r.height - stg.offsetHeight);
-    const p = clamp((pinTop - r.top) / total);
+    // Hold still at the top for the first 14% (jug settles in view), then run the
+    // four steps, then hold the "Cheers" frame for the last 6% before releasing.
+    const raw = clamp((pinTop - r.top) / total);
+    const p = clamp((raw - 0.14) / 0.80);
     const t1 = seg(p,0,.25), t2 = seg(p,.25,.5), t3 = seg(p,.5,.75), t4 = seg(p,.75,1);
     const W = hv.clientWidth, H = hv.clientHeight;
 
