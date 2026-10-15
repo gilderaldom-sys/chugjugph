@@ -261,6 +261,42 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
 .video-card .vc-play svg{width:52px;height:52px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.4));}
 .video-card.playing .vc-play{opacity:0;pointer-events:none;}
 
+
+/* plan your night: flavor quiz + crew calculator */
+.plan-night{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:26px 0 24px;}
+.plan-card{background:var(--glass);border:1px solid var(--glass-border);border-radius:18px;padding:20px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);display:flex;flex-direction:column;gap:12px;min-height:250px;}
+.plan-card h3{font-family:'Bebas Neue';font-size:26px;letter-spacing:.02em;color:#fff;line-height:1;}
+.plan-eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.06em;color:var(--orange);text-transform:uppercase;}
+.plan-q{font-weight:800;font-size:16px;color:#fff;}
+.plan-opts{display:flex;flex-direction:column;gap:8px;}
+.plan-opt{text-align:left;background:rgba(255,255,255,.06);color:#fff;font-weight:700;font-size:14px;padding:11px 14px;border-radius:10px;border:1px solid var(--glass-border);transition:background .15s ease,border-color .15s ease,transform .1s ease;}
+.plan-opt:hover{background:rgba(255,255,255,.12);border-color:var(--pink);}
+.plan-opt:active{transform:scale(.98);}
+.plan-prog{display:flex;gap:6px;}
+.plan-prog span{flex:1;height:4px;border-radius:4px;background:var(--glass-border);}
+.plan-prog span.on{background:linear-gradient(90deg,var(--orange),var(--pink));}
+.plan-result{display:flex;gap:14px;align-items:center;}
+.plan-result img{width:96px;height:auto;max-height:130px;object-fit:contain;filter:drop-shadow(0 8px 14px rgba(0,0,0,.45));flex-shrink:0;}
+.plan-result .pr-name{font-family:'Bebas Neue';font-size:30px;line-height:1;color:#fff;}
+.plan-result .pr-line{font-size:13.5px;color:rgba(255,243,214,.8);margin:4px 0;}
+.plan-result .pr-contents{font-family:var(--mono);font-size:11.5px;color:rgba(255,243,214,.62);}
+.plan-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto;}
+.plan-btn{background:linear-gradient(135deg,var(--orange),var(--pink));color:#fff;font-weight:800;font-size:13px;padding:10px 16px;border-radius:9px;transition:transform .1s ease;}
+.plan-btn:active{transform:scale(.95);}
+.plan-btn.ghost{background:rgba(255,255,255,.08);border:1px solid var(--glass-border);}
+.plan-btn:disabled{opacity:.45;cursor:not-allowed;}
+.crew-out{font-family:var(--mono);font-size:13px;color:rgba(255,243,214,.85);}
+.crew-out strong{color:var(--lime);font-size:20px;}
+.crew-slider{width:100%;accent-color:var(--pink);}
+.crew-chips{display:flex;flex-wrap:wrap;gap:6px;}
+.crew-chip{background:rgba(255,255,255,.06);color:rgba(255,243,214,.8);font-size:12px;font-weight:700;padding:6px 11px;border-radius:20px;border:1px solid var(--glass-border);}
+.crew-chip[aria-pressed="true"]{background:var(--fc);color:#101827;border-color:transparent;}
+.crew-mix{font-size:13px;color:rgba(255,243,214,.8);}
+.crew-save{color:var(--lime);font-weight:800;}
+.flavor-card.pulse{animation:flavorPulse 1.6s ease 1;}
+@keyframes flavorPulse{0%,100%{box-shadow:0 0 0 0 transparent;}30%{box-shadow:0 0 0 3px var(--fc,var(--pink)),0 0 34px var(--fc,var(--pink));}}
+@media (max-width:820px){ .plan-night{grid-template-columns:1fr;} }
+@media (prefers-reduced-motion:reduce){ .flavor-card.pulse{animation:none;outline:3px solid var(--fc,var(--pink));} }
 /* chapter story: tags, progress rail, mobile pill, closing hooks */
 .chapter-tag{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--yellow);margin-bottom:12px;opacity:.9;}
 .chapter-tag::before{content:'';width:22px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--orange),var(--pink));}
@@ -1344,6 +1380,152 @@ VIDEOS.forEach((v,i)=>{
   window.addEventListener('scroll', onScroll, { passive:true });
   window.addEventListener('resize', onScroll);
   update();
+})();
+
+// ---- Plan your night: flavor quiz + crew calculator -----------------------
+(function initPlanNight(){
+  const host = document.querySelector('#flavors .section-head');
+  if(!host) return;
+  const el = document.createElement('div');
+  el.className = 'plan-night';
+  host.after(el);
+
+  const QUIZ = [
+    { q:'Where does your night start?', a:[
+      { t:'🏖️ Rooftop at sunset',        s:{ mango:2, blue:1 } },
+      { t:'🕺 Straight to the dance floor', s:{ straw:2, grape:1 } },
+      { t:'🎲 Wherever the chaos is',      s:{ apple:2, grape:1 } },
+      { t:'🌊 Chilling by the pool',       s:{ blue:2, mango:1 } } ] },
+    { q:'Sweet or sharp?', a:[
+      { t:'Sweet, always',  s:{ straw:2, mango:1, grape:1 } },
+      { t:'Sharp and sour', s:{ apple:2, blue:1 } },
+      { t:'A little of both', s:{ blue:1, mango:1, apple:1 } } ] },
+    { q:'Your crew is…', a:[
+      { t:'The loud ones',               s:{ straw:1, apple:2 } },
+      { t:'The smooth ones',             s:{ blue:2, grape:1 } },
+      { t:'The "one more round" crew',   s:{ mango:1, grape:2 } } ] }
+  ];
+  const LINES = {
+    blue:'Cool, citrusy and a little electric.',
+    straw:'Sweet, loud and impossible to ignore.',
+    mango:'Golden-hour energy in a jug.',
+    apple:'Sour, bold and a little unhinged.',
+    grape:'Smooth, rich and dangerously easy.'
+  };
+  const inStock = f => !(liveStock[f.id] !== undefined && liveStock[f.id] <= 0);
+
+  // ---- quiz card
+  const quiz = document.createElement('div');
+  quiz.className = 'plan-card';
+  let step = 0, score = {};
+  function renderQuiz(){
+    if(step < QUIZ.length){
+      const item = QUIZ[step];
+      quiz.innerHTML = `
+        <div class="plan-eyebrow">Not sure? 3 quick taps</div>
+        <h3>Which jug are you?</h3>
+        <div class="plan-prog" aria-hidden="true">${QUIZ.map((_,i)=>`<span class="${i<=step?'on':''}"></span>`).join('')}</div>
+        <div class="plan-q">${item.q}</div>
+        <div class="plan-opts">${item.a.map((o,i)=>`<button type="button" class="plan-opt" data-i="${i}">${o.t}</button>`).join('')}</div>`;
+      quiz.querySelectorAll('.plan-opt').forEach(b=>b.addEventListener('click',()=>{
+        const o = item.a[+b.dataset.i];
+        Object.entries(o.s).forEach(([id,n])=>{ score[id] = (score[id]||0)+n; });
+        step++; renderQuiz();
+      }));
+      return;
+    }
+    const pool = FLAVORS.filter(inStock);
+    const pick = (pool.length ? pool : FLAVORS).slice().sort((a,b)=>(score[b.id]||0)-(score[a.id]||0))[0];
+    quiz.innerHTML = `
+      <div class="plan-eyebrow">Your jug</div>
+      <div class="plan-result" aria-live="polite">
+        <img src="${pick.img}" alt="${pick.name} Chug Jug PH cocktail kit">
+        <div>
+          <div class="pr-name">${pick.name}</div>
+          <div class="pr-line">${LINES[pick.id]||''}</div>
+          <div class="pr-contents">${pick.contents}</div>
+        </div>
+      </div>
+      <div class="plan-actions">
+        <button type="button" class="plan-btn" id="quizAdd">Add to cart · ₱${priceFor(pick.id)}</button>
+        <button type="button" class="plan-btn ghost" id="quizShow">See it below</button>
+        <button type="button" class="plan-btn ghost" id="quizRetake">Retake</button>
+      </div>`;
+    quiz.querySelector('#quizAdd').addEventListener('click',()=>addToCart(pick.id));
+    quiz.querySelector('#quizRetake').addEventListener('click',()=>{ step=0; score={}; renderQuiz(); });
+    quiz.querySelector('#quizShow').addEventListener('click',()=>{
+      const idx = FLAVORS.findIndex(f=>f.id===pick.id);
+      const card = document.querySelectorAll('#flavorGrid .flavor-card')[idx];
+      if(!card) return;
+      card.scrollIntoView({ behavior:'smooth', block:'center' });
+      card.classList.remove('pulse'); void card.offsetWidth; card.classList.add('pulse');
+    });
+  }
+
+  // ---- crew calculator card
+  const crew = document.createElement('div');
+  crew.className = 'plan-card';
+  let guests = 12, touched = false;
+  const picked = new Set(FLAVORS.map(f=>f.id));
+  function planFor(){
+    const avail = FLAVORS.filter(f=>inStock(f) && picked.has(f.id));
+    const want = Math.max(1, Math.ceil(guests/7));
+    const qty = {}; let placed = 0, guard = 0;
+    while(avail.length && placed < want && guard++ < 500){
+      const f = avail[placed % avail.length];
+      const cap = liveStock[f.id] !== undefined ? liveStock[f.id] : Infinity;
+      if((qty[f.id]||0) < cap){ qty[f.id] = (qty[f.id]||0)+1; placed++; }
+      else { avail.splice(avail.indexOf(f),1); }
+    }
+    return { want, qty, placed };
+  }
+  function renderCrewResult(){
+    const { want, qty, placed } = planFor();
+    const out = crew.querySelector('#crewOut'), mix = crew.querySelector('#crewMix'), btn = crew.querySelector('#crewFill');
+    out.innerHTML = `<strong>${guests}</strong> guests → <strong>${want}</strong> jug${want>1?'s':''} <span style="opacity:.7">(serves ${want*6}–${want*8})</span>`;
+    if(!placed){ mix.textContent = 'Pick at least one flavor that is in stock.'; btn.disabled = true; return; }
+    const { payableSubtotal, bundleSavings } = computeBundlePricing(qty);
+    const lines = Object.entries(qty).map(([id,n])=>`${n} × ${FLAVORS.find(f=>f.id===id).name}`).join(', ');
+    const short = placed < want ? ` (only ${placed} in stock)` : '';
+    mix.innerHTML = `${lines}${short} — <strong>₱${payableSubtotal.toLocaleString()}</strong>${bundleSavings>0?` <span class="crew-save">· you save ₱${bundleSavings.toLocaleString()} with ${(activeBundle&&activeBundle.name)||'Party Pack'}</span>`:''}`;
+    btn.disabled = false;
+  }
+  function renderCrew(){
+    crew.innerHTML = `
+      <div class="plan-eyebrow">Planning a party?</div>
+      <h3>How many jugs for my crew?</h3>
+      <label class="plan-q" for="crewSlider">How many guests?</label>
+      <input type="range" class="crew-slider" id="crewSlider" min="2" max="60" step="1" value="${guests}">
+      <div class="crew-out" id="crewOut" aria-live="polite"></div>
+      <div class="crew-chips" role="group" aria-label="Flavors to include">
+        ${FLAVORS.map(f=>`<button type="button" class="crew-chip" style="--fc:${f.color}" data-id="${f.id}" aria-pressed="${picked.has(f.id)}" ${inStock(f)?'':'disabled'}>${f.name}</button>`).join('')}
+      </div>
+      <div class="crew-mix" id="crewMix"></div>
+      <div class="plan-actions"><button type="button" class="plan-btn" id="crewFill">Fill my cart</button></div>`;
+    crew.querySelector('#crewSlider').addEventListener('input',e=>{ touched = true; guests = +e.target.value; renderCrewResult(); });
+    crew.querySelectorAll('.crew-chip').forEach(c=>c.addEventListener('click',()=>{
+      const id = c.dataset.id;
+      touched = true;
+      if(picked.has(id)) picked.delete(id); else picked.add(id);
+      c.setAttribute('aria-pressed', picked.has(id));
+      renderCrewResult();
+    }));
+    crew.querySelector('#crewFill').addEventListener('click',()=>{
+      const { qty } = planFor();
+      Object.entries(qty).forEach(([id,n])=>{
+        const cap = liveStock[id] !== undefined ? liveStock[id] : Infinity;
+        cart[id] = Math.min(cap, (cart[id]||0) + n);
+      });
+      saveCart(); renderCart(); renderFlavorGrid(); openCart();
+    });
+    renderCrewResult();
+  }
+
+  el.append(quiz, crew);
+  renderQuiz();
+  renderCrew();
+  // stock/prices/bundle load asynchronously; refresh the dynamic bits when they land
+  setTimeout(()=>{ if(step>=QUIZ.length) renderQuiz(); if(!touched) renderCrew(); }, 2500);
 })();
 </script>
 </body>
