@@ -1,0 +1,94 @@
+/* Shared styles for terms.html and privacy.html — matches the Chug Jug PH storefront. */
+:root{
+  --navy:#0B1220; --orange:#FF6B35; --lime:#B8E02F; --pink:#FF3F81; --yellow:#FFD93B; --cream:#FFF3D6;
+  --glass:rgba(255,255,255,.045); --glass-border:rgba(255,255,255,.10);
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+}
+*{margin:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;scroll-padding-top:84px;}
+body{
+  background:var(--navy);color:var(--cream);font-family:'Montserrat',system-ui,sans-serif;line-height:1.7;
+  padding-bottom:env(safe-area-inset-bottom,0px);min-height:100vh;overflow-x:hidden;
+  background-image:
+    radial-gradient(520px 520px at 8% 4%, rgba(255,107,53,.16), transparent 70%),
+    radial-gradient(560px 560px at 96% 22%, rgba(139,92,246,.14), transparent 70%),
+    radial-gradient(520px 520px at 50% 100%, rgba(255,63,129,.10), transparent 70%);
+  background-repeat:no-repeat;
+}
+a{color:var(--yellow);text-underline-offset:3px;}
+a:hover{color:#fff;}
+
+.lg-header{
+  position:sticky;top:0;z-index:20;background:rgba(11,18,32,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--glass-border);padding-top:env(safe-area-inset-top,0px);
+}
+.lg-header-in{max-width:880px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;}
+.lg-logo{display:flex;align-items:center;text-decoration:none;}
+.lg-logo img{height:48px;width:auto;display:block;filter:drop-shadow(0 0 10px rgba(255,63,129,.35));}
+.lg-back{
+  font-weight:800;font-size:13.5px;text-decoration:none;color:#fff;padding:9px 16px;border-radius:9px;
+  background:linear-gradient(135deg,var(--orange),var(--pink));box-shadow:0 6px 18px rgba(255,63,129,.25);white-space:nowrap;
+}
+.lg-back:hover{color:#fff;filter:brightness(1.08);}
+
+main.legal{max-width:880px;margin:0 auto;padding:48px 20px 72px;}
+.lg-kicker{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--yellow);}
+.legal h1{
+  font-family:'Bebas Neue',Impact,sans-serif;font-weight:400;font-size:clamp(46px,8vw,80px);line-height:.98;margin:8px 0 10px;color:#fff;
+}
+.legal h1 .accent{background:linear-gradient(90deg,var(--orange),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent;}
+.lg-meta{font-family:var(--mono);font-size:12.5px;color:rgba(255,243,214,.62);margin-bottom:26px;}
+
+.lg-card{background:var(--glass);border:1px solid var(--glass-border);border-radius:16px;padding:20px 22px;margin:0 0 26px;}
+.lg-card h2{font-size:15px;margin:0 0 8px;color:#fff;border:0;padding:0;}
+.lg-card p,.lg-card li{font-size:14.5px;color:rgba(255,243,214,.88);}
+.lg-card.plain{border-color:rgba(184,224,47,.45);background:linear-gradient(135deg,rgba(184,224,47,.10),rgba(255,107,53,.06));}
+.lg-card.warn{border-color:rgba(255,63,129,.5);background:linear-gradient(135deg,rgba(255,63,129,.12),rgba(139,92,246,.07));}
+
+.lg-toc{counter-reset:toc;list-style:none;padding:0;columns:2;column-gap:28px;}
+.lg-toc li{break-inside:avoid;margin:0 0 6px;font-size:14px;}
+.lg-toc a{color:rgba(255,243,214,.9);text-decoration:none;}
+.lg-toc a:hover{color:var(--yellow);text-decoration:underline;}
+.lg-toc a::before{counter-increment:toc;content:counter(toc) ". ";color:var(--yellow);font-family:var(--mono);font-size:12.5px;}
+
+.legal section{margin:38px 0 0;}
+.legal h2{font-size:21px;font-weight:800;color:#fff;margin:0 0 10px;padding-top:6px;letter-spacing:.01em;}
+.legal h2 .n{font-family:var(--mono);font-size:14px;color:var(--yellow);margin-right:8px;font-weight:600;}
+.legal h3{font-size:15.5px;font-weight:700;color:var(--yellow);margin:20px 0 6px;}
+.legal p{margin:0 0 12px;font-size:15.5px;color:rgba(255,243,214,.9);}
+.legal ul,.legal ol{margin:0 0 14px 1.25em;padding:0;}
+.legal li{margin:0 0 7px;font-size:15.5px;color:rgba(255,243,214,.9);}
+.legal li::marker{color:var(--orange);}
+.legal strong{color:#fff;}
+
+.lg-table{width:100%;border-collapse:separate;border-spacing:0;margin:8px 0 18px;border:1px solid var(--glass-border);border-radius:12px;overflow:hidden;font-size:14.5px;}
+.lg-table th,.lg-table td{text-align:left;vertical-align:top;padding:11px 14px;border-bottom:1px solid var(--glass-border);}
+.lg-table th{background:rgba(255,255,255,.06);color:#fff;font-size:12.5px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;}
+.lg-table tr:last-child td{border-bottom:0;}
+.lg-table td:first-child{color:#fff;font-weight:700;width:30%;}
+.lg-table td{color:rgba(255,243,214,.88);}
+
+.lg-foot{margin-top:52px;padding-top:22px;border-top:1px solid var(--glass-border);font-size:13.5px;color:rgba(255,243,214,.62);display:flex;flex-wrap:wrap;gap:8px 20px;justify-content:space-between;}
+.lg-foot a{color:rgba(255,243,214,.85);}
+
+@media (max-width:640px){
+  main.legal{padding:34px 16px 56px;}
+  .lg-header-in{padding:8px 16px;}
+  .lg-logo img{height:42px;}
+  .lg-toc{columns:1;}
+  .legal h2{font-size:19px;}
+  .legal p,.legal li{font-size:15px;}
+  .lg-table,.lg-table tbody,.lg-table tr,.lg-table td,.lg-table th{display:block;width:100%;}
+  .lg-table thead{display:none;}
+  .lg-table tr{border-bottom:1px solid var(--glass-border);padding:6px 0;}
+  .lg-table tr:last-child{border-bottom:0;}
+  .lg-table td{border:0;padding:4px 14px;}
+  .lg-table td:first-child{width:100%;padding-top:10px;}
+}
+@media print{
+  body{background:#fff;color:#111;}
+  .lg-header,.lg-back{display:none;}
+  .legal h1,.legal h2,.legal strong,.lg-table td:first-child{color:#000;}
+  .legal p,.legal li,.lg-card p,.lg-card li,.lg-table td{color:#222;}
+  a{color:#000;}
+}
