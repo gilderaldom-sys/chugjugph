@@ -327,6 +327,41 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
   .build-left .layer,.build-right .layer{transform:translateY(-24px) scale(.92);}
 }
 @media (prefers-reduced-motion:reduce){ .layer,.build-jug img,.build-glow{transition:none;transition-delay:0s;} }
+
+/* how it works: pinned scroll-scrubbed scene */
+.how-scroll{display:none;}
+.how.how-pinned .steps{display:none;}
+.how.how-pinned .how-scroll{display:block;height:340vh;position:relative;}
+.how-stage{position:sticky;top:calc(var(--header-h) + env(safe-area-inset-top,0px) + 8px);height:calc(100vh - var(--header-h) - 24px);min-height:460px;max-height:640px;display:grid;grid-template-columns:1.1fr .9fr;gap:24px;align-items:center;}
+.how-visual{position:relative;width:100%;max-width:520px;aspect-ratio:520/420;margin:0 auto;}
+.how-visual > *{position:absolute;}
+.hv-jug{left:2%;bottom:20%;width:50%;transform-origin:50% 90%;will-change:transform;}
+.hv-jug img{display:block;width:100%;height:auto;max-height:330px;object-fit:contain;filter:drop-shadow(0 14px 22px rgba(0,0,0,.5));}
+.hv-frost{position:absolute;inset:-4% -12%;border-radius:50%;background:radial-gradient(ellipse at center,rgba(160,220,255,.85) 0%,rgba(160,220,255,0) 68%);filter:blur(10px);opacity:0;pointer-events:none;}
+.hv-ice{inset:0;pointer-events:none;}
+.hv-cube{position:absolute;width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,rgba(255,255,255,.85),rgba(160,215,255,.45));border:1px solid rgba(255,255,255,.7);box-shadow:0 0 10px rgba(160,220,255,.6);opacity:0;will-change:transform,opacity;}
+.hv-svg{inset:0;width:100%;height:100%;overflow:visible;pointer-events:none;}
+#hvCup{transform-box:fill-box;transform-origin:50% 100%;will-change:transform;}
+.hv-sparks{inset:0;pointer-events:none;}
+.hv-spark{position:absolute;left:46%;top:70%;width:8px;height:8px;border-radius:50%;background:var(--yellow);box-shadow:0 0 10px var(--yellow);opacity:0;will-change:transform,opacity;}
+.hv-cheers{right:4%;top:6%;font-family:'Bebas Neue';font-size:44px;color:var(--yellow);text-shadow:0 0 20px rgba(255,217,59,.7);opacity:0;transform:scale(.7) rotate(-6deg);will-change:transform,opacity;}
+.how-side{display:flex;flex-direction:column;gap:18px;}
+.how-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;}
+.how-list li{display:flex;gap:14px;align-items:flex-start;padding:14px 16px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass);opacity:.45;transform:scale(.97);transition:opacity .3s ease,transform .3s ease,border-color .3s ease,background .3s ease;}
+.how-list li.on{opacity:1;transform:none;border-color:var(--pink);background:rgba(255,255,255,.07);}
+.how-list li.done{opacity:.75;}
+.how-list .hl-num{font-family:var(--mono);font-size:12.5px;color:var(--yellow);padding-top:4px;}
+.how-list .hl-name{font-family:'Bebas Neue';font-size:26px;color:#fff;line-height:1;}
+.how-list .hl-copy{font-size:13.5px;color:rgba(255,243,214,.8);margin-top:4px;}
+.how-hint{font-family:var(--mono);font-size:11.5px;color:rgba(255,243,214,.6);}
+@media (max-width:820px){
+  .how-stage{grid-template-columns:1fr;gap:6px;align-content:start;padding-top:4px;max-height:none;}
+  .how-visual{max-width:380px;}
+  .how-list li{display:none;padding:12px 14px;}
+  .how-list li.on{display:flex;}
+  .how-hint{text-align:center;}
+}
+@media (prefers-reduced-motion:reduce){ .how-list li{transition:none;} }
 /* chapter story: tags, progress rail, mobile pill, closing hooks */
 .chapter-tag{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--yellow);margin-bottom:12px;opacity:.9;}
 .chapter-tag::before{content:'';width:22px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--orange),var(--pink));}
@@ -452,6 +487,28 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
       <div class="step"><div class="step-num">2</div><div class="step-name">Shake it</div></div>
       <div class="step"><div class="step-num">3</div><div class="step-name">Pour it</div></div>
       <div class="step"><div class="step-num">4</div><div class="step-name">Chug it</div></div>
+    </div>
+    <div class="how-scroll" id="howScroll" aria-hidden="false">
+      <div class="how-stage">
+        <div class="how-visual" id="hv">
+          <div class="hv-ice" id="hvIce"></div>
+          <div class="hv-jug" id="hvJug"><div class="hv-frost" id="hvFrost"></div><img id="hvImg" alt=""></div>
+          <svg class="hv-svg" viewBox="0 0 520 420" aria-hidden="true">
+            <defs><clipPath id="hvCupClip"><path d="M113 322 L193 322 L182 392 Q181 400 173 400 L133 400 Q125 400 124 392 Z"/></clipPath></defs>
+            <path id="hvStream" d="M153 296 L153 396" fill="none" stroke="#FF6B35" stroke-width="6" stroke-linecap="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="1"/>
+            <g id="hvCup">
+              <rect id="hvFill" x="108" y="400" width="90" height="0" fill="#FF6B35" clip-path="url(#hvCupClip)" opacity=".92"/>
+              <path d="M113 322 L193 322 L182 392 Q181 400 173 400 L133 400 Q125 400 124 392 Z" fill="rgba(255,255,255,.08)" stroke="rgba(255,243,214,.75)" stroke-width="2.5" stroke-linejoin="round"/>
+            </g>
+          </svg>
+          <div class="hv-sparks" id="hvSparks"></div>
+          <div class="hv-cheers" id="hvCheers">Cheers!</div>
+        </div>
+        <div class="how-side">
+          <ol class="how-list" id="howList"></ol>
+          <div class="how-hint" id="howHint">Keep scrolling — the jug does the rest.</div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -1619,7 +1676,7 @@ VIDEOS.forEach((v,i)=>{
       const c = document.createElement('button');
       c.type = 'button'; c.className = 'crew-chip'; c.style.setProperty('--fc', f.color);
       c.textContent = f.name; c.setAttribute('aria-pressed', f.id===cur.id);
-      c.addEventListener('click', ()=>{ cur = f; render(); });
+      c.addEventListener('click', ()=>{ cur = f; render(); document.dispatchEvent(new CustomEvent('chug:flavor',{detail:f})); });
       chips.appendChild(c);
     });
   }
@@ -1657,6 +1714,111 @@ VIDEOS.forEach((v,i)=>{
   }
   // refresh price / stock once the live catalog has loaded
   setTimeout(()=>{ const o = opened; render(); setOpen(o); }, 2500);
+})();
+
+// ---- How it works: pinned, scroll-scrubbed scene ---------------------------
+(function initHowScene(){
+  const sec = document.getElementById('how');
+  const scroller = document.getElementById('howScroll');
+  if(!sec || !scroller) return;
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; // keep the static cards
+  sec.classList.add('how-pinned');
+
+  const STEPS = [
+    { n:'1', name:'Chill it', copy:'Get the jug nice and cold — ice in, frost on.' },
+    { n:'2', name:'Shake it', copy:'Give it a good shake so everything mixes.' },
+    { n:'3', name:'Pour it',  copy:'Pour from the tap straight into your cup.' },
+    { n:'4', name:'Chug it',  copy:'Raise it. Cheers. Chug responsibly.' }
+  ];
+  const list = document.getElementById('howList');
+  list.innerHTML = STEPS.map(s=>`<li><span class="hl-num">${s.n}</span><span><div class="hl-name">${s.name}</div><div class="hl-copy">${s.copy}</div></span></li>`).join('');
+  const lis = [...list.children];
+
+  const hv = document.getElementById('hv'), jug = document.getElementById('hvJug'), img = document.getElementById('hvImg');
+  const frost = document.getElementById('hvFrost'), iceBox = document.getElementById('hvIce');
+  const cup = document.getElementById('hvCup'), fill = document.getElementById('hvFill'), stream = document.getElementById('hvStream');
+  const sparksBox = document.getElementById('hvSparks'), cheers = document.getElementById('hvCheers');
+  const hint = document.getElementById('howHint');
+
+  // follow the flavor the visitor chose in "Build it" (falls back to the first flavor)
+  let flavor = FLAVORS[0];
+  function setFlavor(f){
+    flavor = f; img.src = f.img; img.alt = `${f.name} Chug Jug PH cocktail kit`;
+    stream.setAttribute('stroke', f.color); fill.setAttribute('fill', f.color);
+  }
+  setFlavor(flavor);
+  document.addEventListener('chug:flavor', e=>{ if(e.detail) setFlavor(e.detail); });
+
+  // ice cubes + sparks
+  const cubes = Array.from({length:6},(_,i)=>{
+    const c = document.createElement('div'); c.className = 'hv-cube';
+    c.style.left = (12 + i*6.4) + '%'; iceBox.appendChild(c);
+    return { el:c, rot:(i%2?1:-1)*(15+i*9) };
+  });
+  const sparks = Array.from({length:10},(_,i)=>{
+    const d = document.createElement('div'); d.className = 'hv-spark';
+    d.style.background = ['#FFD93B','#FF3F81','#B8E02F','#FF6B35'][i%4];
+    sparksBox.appendChild(d); return { el:d, ang:(i/10)*Math.PI*2 };
+  });
+
+  const clamp = (v,a=0,b=1)=>Math.min(b,Math.max(a,v));
+  const seg = (p,a,b)=>clamp((p-a)/(b-a));
+  const ease = t=>t*t*(3-2*t);
+  let ticking = false;
+
+  function frame(){
+    ticking = false;
+    const r = scroller.getBoundingClientRect();
+    const total = Math.max(1, r.height - window.innerHeight*0.8);
+    const p = clamp(-r.top / total);
+    const t1 = seg(p,0,.25), t2 = seg(p,.25,.5), t3 = seg(p,.5,.75), t4 = seg(p,.75,1);
+    const W = hv.clientWidth, H = hv.clientHeight;
+
+    // 1 — chill: ice drops into the jug, frost glows
+    cubes.forEach((c,i)=>{
+      const a = seg(t1, i*0.1, i*0.1+0.5);
+      const y = -H*0.35 + a*(H*0.35 + H*0.18);          // from above to the jug's opening
+      const fadeOut = i<3 ? 1 : 1;                       // cubes settle inside, then dim
+      c.el.style.opacity = (a>0 ? (a<1 ? 1 : 1-ease(seg(p,.25,.32))) : 0) * fadeOut;
+      c.el.style.transform = `translateY(${y}px) rotate(${c.rot*a}deg)`;
+    });
+    frost.style.opacity = (ease(t1)*0.55 * (1 - ease(seg(p,.52,.7)))).toFixed(3);
+
+    // 2 — shake: jug rattles, amplitude eases in/out
+    const env = Math.sin(t2*Math.PI);
+    const rot = Math.sin(t2*Math.PI*10)*7*env;
+    const dx = Math.sin(t2*Math.PI*10+1)*6*env;
+    // 3 — pour: jug lifts a touch; 4 — chug: settles
+    const lift = ease(t3)*(1-ease(t4))*-14;
+    jug.style.transform = `translate(${dx}px,${lift}px) rotate(${rot}deg)`;
+
+    // 3 — pour: stream from the tap into the cup, cup fills
+    const stIn = seg(t3,0,.2), stOut = seg(t3,.85,1);
+    stream.style.strokeDashoffset = (1 - stIn + stOut).toFixed(3);
+    const fh = ease(seg(t3,.15,1))*72;
+    fill.setAttribute('y', (400 - fh).toFixed(1)); fill.setAttribute('height', fh.toFixed(1));
+
+    // 4 — chug: cup lifts, sparks burst, cheers pops
+    const lf = ease(t4);
+    cup.style.transform = `translate(${92*lf}px,${-62*lf}px) rotate(${12*lf}deg) scale(${1+0.18*lf})`;
+    const burst = seg(t4,.35,1);
+    sparks.forEach(s=>{
+      const dist = 20 + burst*86;
+      s.el.style.opacity = burst>0 ? (1-burst).toFixed(3) : 0;
+      s.el.style.transform = `translate(${Math.cos(s.ang)*dist}px,${Math.sin(s.ang)*dist}px) scale(${1-burst*0.5})`;
+    });
+    cheers.style.opacity = ease(seg(t4,.45,.8)).toFixed(3);
+    cheers.style.transform = `scale(${0.7+0.3*ease(seg(t4,.45,.8))}) rotate(-6deg)`;
+
+    // steps list + hint
+    const idx = p<.25?0 : p<.5?1 : p<.75?2 : 3;
+    lis.forEach((li,k)=>{ li.classList.toggle('on',k===idx); li.classList.toggle('done',k<idx); });
+    hint.style.opacity = p > .92 ? 0.35 : 1;
+  }
+  function onScroll(){ if(!ticking){ ticking = true; requestAnimationFrame(frame); } }
+  window.addEventListener('scroll', onScroll, { passive:true });
+  window.addEventListener('resize', onScroll);
+  frame();
 })();
 </script>
 </body>
