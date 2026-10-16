@@ -228,6 +228,8 @@ footer .foot-tag{color:var(--yellow);font-weight:700;}
 .modal{position:fixed;inset:0;z-index:99;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s ease;background:rgba(4,7,14,.65);backdrop-filter:blur(4px);}
 .modal.open{opacity:1;pointer-events:auto;}
 .modal-box{background:rgba(14,20,34,.96);backdrop-filter:blur(20px);color:var(--fg);border:1px solid var(--glass-border);border-radius:16px;max-width:440px;width:100%;max-height:88vh;overflow-y:auto;padding:26px;}
+.modal-close{position:sticky;top:0;float:right;margin:-14px -14px 0 8px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.12);border:1px solid var(--glass-border);color:#fff;font-size:16px;line-height:1;z-index:3;display:flex;align-items:center;justify-content:center;}
+.modal-close:hover{background:rgba(255,255,255,.22);}
 .modal-box h3{font-family:'Bebas Neue';font-size:28px;margin-bottom:6px;color:#fff;}
 .modal-box .sub{font-size:13.5px;color:rgba(255,243,214,.55);margin-bottom:18px;}
 .field{margin-bottom:14px;}
@@ -699,7 +701,8 @@ html.gl .flavor-card,html.gl .plan-card,html.gl .step{background:rgba(10,16,32,.
 
 <div class="modal" id="checkoutModal">
   <div class="modal-box">
-    <h3>Complete your order</h3>
+    <button class="modal-close" type="button" aria-label="Close" onclick="closeAll()">✕</button>
+        <h3>Complete your order</h3>
     <div class="sub">Pay via GCash or Maya, then place your order — we'll confirm your payment and reach out to arrange delivery.</div>
     <div class="order-summary" id="orderSummary"></div>
     <div class="field">
@@ -750,7 +753,8 @@ html.gl .flavor-card,html.gl .plan-card,html.gl .step{background:rgba(10,16,32,.
 
 <div class="modal" id="trackModal">
   <div class="modal-box">
-    <h3>Track your order</h3>
+    <button class="modal-close" type="button" aria-label="Close" onclick="closeAll()">✕</button>
+        <h3>Track your order</h3>
     <div class="sub">Enter your order number and the contact number you checked out with.</div>
     <div class="field"><label>Order number</label><input id="trackOrderNo" placeholder="WEB-XXXXXXXX" style="text-transform:uppercase;"></div>
     <div class="field"><label>Contact number</label><input id="trackPhone" placeholder="09XX XXX XXXX"></div>
@@ -1989,7 +1993,11 @@ VIDEOS.forEach(v=>vgrid.appendChild(makeVideoCard(v)));
   frame();
 })();
 </script>
-<script>document.getElementById("cpYear").textContent=new Date().getFullYear();</script>
+<script>document.getElementById("cpYear").textContent=new Date().getFullYear();
+// Close modals with Escape or by tapping the dimmed backdrop (the checkout/track dialogs also have a close button).
+document.addEventListener('keydown',function(e){ if(e.key==='Escape' && document.querySelector('.modal.open')) closeAll(); });
+document.querySelectorAll('.modal').forEach(function(m){ m.addEventListener('click',function(e){ if(e.target===m) closeAll(); }); });
+</script>
 <script type="module" src="scene.js"></script>
 </body>
 </html>
