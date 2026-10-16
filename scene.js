@@ -1,5 +1,5 @@
 // Chug Jug PH — fixed WebGL backdrop (Blue Razz Rush jug) behind the page + Lenis smooth scroll.
-// Ported from the "Ascend" layout spec (three r0.143), with the Blue Razz Rush jug in place of the planet.
+// Ported from the "Ascend" layout spec (three r0.143), with the Blue Razz Rush and Strawberry Bomb jugs in place of the planet.
 // Everything degrades quietly: if WebGL or the CDN fails, the page keeps its normal dark background.
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -147,29 +147,35 @@ function initPlanet() {
   controls.minDistance = 3.5; controls.maxDistance = 16; controls.target.set(0, 0, 0);
 
   // scroll keyframes
-  const STOPS_X = [{p:0,v:0},{p:0.08,v:-3.7},{p:0.4,v:3.7},{p:0.7,v:-3.7},{p:0.9,v:3.5},{p:1,v:0}];
-  const STOPS_Y = [{p:0,v:-3.7},{p:0.08,v:0.2},{p:0.4,v:0.1},{p:0.7,v:0.2},{p:0.9,v:0.1},{p:1,v:-0.2}];
-  const STOPS_S = [{p:0,v:1.15},{p:0.08,v:0.8},{p:0.4,v:0.8},{p:0.7,v:0.8},{p:0.9,v:0.8},{p:1,v:0.9}];
+  // Two flavors that mirror each other: Blue Razz Rush (sign +1) and Strawberry Bomb (sign -1).
+  const STOPS_X = [{p:0,v:-1.9},{p:0.08,v:-3.7},{p:0.4,v:3.7},{p:0.7,v:-3.7},{p:0.9,v:3.5},{p:1,v:-2.3}]; // blue's x; strawberry mirrors it
+  const STOPS_Y = [{p:0,v:-3.6},{p:0.08,v:0.2},{p:0.4,v:0.1},{p:0.7,v:0.2},{p:0.9,v:0.1},{p:1,v:-0.2}];
+  const STOPS_S = [{p:0,v:1.0},{p:0.08,v:0.78},{p:0.4,v:0.78},{p:0.7,v:0.78},{p:0.9,v:0.78},{p:1,v:0.85}];
 
-  const worldGroup = new THREE.Group();
-  worldGroup.position.set(STOPS_X[0].v, STOPS_Y[0].v, 0);
-  worldGroup.scale.setScalar(STOPS_S[0].v);
-  worldGroup.visible = false; // shown once the jug image has loaded, so the halo doesn't pop in alone
-  scene.add(worldGroup);
-  const jugGroup = new THREE.Group(); worldGroup.add(jugGroup);
-
-  // atmosphere halo
-  const glowMat = new THREE.ShaderMaterial({
-    uniforms: { uGlow:{value:hexToVec3(CONFIG.glowColor)}, uIntensity:{value:CONFIG.glowIntensity} },
+  const makeGlowMat = (hex) => new THREE.ShaderMaterial({
+    uniforms: { uGlow:{value:hexToVec3(hex)}, uIntensity:{value:CONFIG.glowIntensity} },
     vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
     fragmentShader: `uniform vec3 uGlow; uniform float uIntensity; varying vec2 vUv;
       void main(){ float d = length(vUv - 0.5) * 2.0; float a = pow(clamp(1.0 - d, 0.0, 1.0), 2.2); gl_FragColor = vec4(uGlow * a * uIntensity, a); }`,
     transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
   });
-  const glowMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), glowMat);
-  glowMesh.scale.setScalar(4.4);
-  glowMesh.layers.set(LAYERS.ENTIRE_SCENE);
-  worldGroup.add(glowMesh);
+  const JUG_DEFS = [
+    { url: 'media/blue-razz.webp',       glow: '#2f7bff', sign:  1, delay: 0 },
+    { url: 'media/strawberry-bomb.webp', glow: '#ff3f81', sign: -1, delay: 0.35 },
+  ];
+  const jugs = JUG_DEFS.map((d) => {
+    const world = new THREE.Group();
+    world.position.set(d.sign * STOPS_X[0].v, STOPS_Y[0].v, 0);
+    world.scale.setScalar(STOPS_S[0].v);
+    world.visible = false; // shown once its image has loaded, so the halo doesn't pop in alone
+    scene.add(world);
+    const group = new THREE.Group(); world.add(group);
+    const glow = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), makeGlowMat(d.glow));
+    glow.scale.setScalar(4.4);
+    glow.layers.set(LAYERS.ENTIRE_SCENE);
+    world.add(glow);
+    return { ...d, world, group, glow, loaded: false, entryStart: 0 };
+  });
 
   const uRes = new THREE.Vector2(W * DPR, H * DPR);
 
@@ -263,19 +269,20 @@ function initPlanet() {
 
   // ---- the jug: a lit-from-behind billboard of the Blue Razz Rush photo ----
   const JUG_H = 3.6;
-  let jugMesh = null, loaded = false, entryStart = 0;
   const ENTRY_DUR = reduceMotion ? 0.001 : 1.9, ENTRY_START_Y = -6.5;
-  new THREE.TextureLoader().load(JUG_IMG, (tex) => {
-    tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
-    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-    const aspect = tex.image.width / tex.image.height;
-    const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false, opacity: 0.88, color: 0xc4cce4 });
-    jugMesh = new THREE.Mesh(new THREE.PlaneGeometry(JUG_H * aspect, JUG_H), mat);
-    jugMesh.layers.set(LAYERS.ENTIRE_SCENE);
-    jugMesh.renderOrder = 3;
-    jugGroup.add(jugMesh);
-    worldGroup.visible = true; loaded = true; entryStart = performance.now() / 1000;
-  }, undefined, () => { console.warn('jug image unavailable'); });
+  jugs.forEach((j) => {
+    new THREE.TextureLoader().load(j.url, (tex) => {
+      tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; tex.magFilter = THREE.LinearFilter;
+      tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+      const aspect = tex.image.width / tex.image.height;
+      const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false, opacity: 0.88, color: 0xc4cce4 });
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(JUG_H * aspect, JUG_H), mat);
+      mesh.layers.set(LAYERS.ENTIRE_SCENE);
+      mesh.renderOrder = 3;
+      j.group.add(mesh);
+      j.world.visible = true; j.loaded = true; j.entryStart = performance.now() / 1000 + j.delay;
+    }, undefined, () => { console.warn('jug image unavailable', j.url); });
+  });
   document.documentElement.classList.add('gl');
 
   // ---- resize ----
@@ -307,16 +314,19 @@ function initPlanet() {
     curX += (sample(STOPS_X, curP) * sideScale - curX) * k;
     curY += (sample(STOPS_Y, curP) - curY) * k;
     curS += (sample(STOPS_S, curP) - curS) * k;
-    let entryY = ENTRY_START_Y;
-    if (loaded) { const t = clamp((now - entryStart) / ENTRY_DUR, 0, 1); entryY = ENTRY_START_Y * (1 - (1 - Math.pow(1 - t, 3))); }
-    worldGroup.position.set(curX, curY + entryY, 0);
-    const fit = clamp(window.innerWidth / 1000, 0.45, 1); // smaller jug on narrow screens
-    worldGroup.scale.setScalar(curS * fit);
-    // the jug turns as you scroll (a swaying yaw, never showing its back) and floats gently
-    jugGroup.rotation.y = Math.sin(curP * Math.PI * 3) * 0.55 + Math.sin(spinPhase * 0.6) * 0.06;
-    jugGroup.rotation.z = Math.sin(curP * Math.PI * 2) * 0.07 + Math.sin(spinPhase * 0.5) * 0.015;
-    jugGroup.position.y = Math.sin(spinPhase * 0.9) * 0.08;
-    glowMesh.quaternion.copy(camera.quaternion);
+    const fit = clamp(window.innerWidth / 1000, 0.45, 1); // smaller jugs on narrow screens
+    jugs.forEach((j, n) => {
+      let entryY = ENTRY_START_Y;
+      if (j.loaded) { const t = clamp((now - j.entryStart) / ENTRY_DUR, 0, 1); entryY = ENTRY_START_Y * Math.pow(1 - t, 3); }
+      j.world.position.set(j.sign * curX, curY + entryY, 0);
+      j.world.scale.setScalar(curS * fit);
+      // each jug turns as you scroll (a swaying yaw, never showing its back) and floats gently, out of step with its partner
+      const ph = spinPhase + n * 1.7;
+      j.group.rotation.y = j.sign * (Math.sin(curP * Math.PI * 3) * 0.55) + Math.sin(ph * 0.6) * 0.06;
+      j.group.rotation.z = j.sign * Math.sin(curP * Math.PI * 2) * 0.07 + Math.sin(ph * 0.5) * 0.015;
+      j.group.position.y = Math.sin(ph * 0.9) * 0.08;
+      j.glow.quaternion.copy(camera.quaternion);
+    });
 
     controls.update();
     camera.layers.set(LAYERS.TORUS_SCENE); torusComposer.render();
